@@ -58,10 +58,15 @@ habits-app/
 │   ├── queries.ts          # All CRUD operations (categories, activities, time entries)
 │   └── seed.ts             # Seeds 10 preset categories + ~40 activities on first launch
 ├── hooks/                  # Custom React hooks
+│   ├── useTimer.ts         # Core timer hook (start/stop/switch via PowerSync useQuery)
+│   ├── useElapsedTime.ts   # Live-ticking elapsed seconds (recalculates from startedAt)
+│   └── useForgottenTimer.ts # Detects stale timers on app foreground (>2h or different day)
 ├── lib/                    # Library initializations
 │   ├── powersync.ts        # PowerSync DB instance (OPSqliteOpenFactory, local-only mode)
+│   ├── timezone.ts         # IANA timezone helpers (format, isToday, duration display)
 │   └── uuid.ts             # generateId() — React Native-safe UUID generation
 ├── store/                  # Zustand stores (UI state only)
+│   └── uiStore.ts          # Selected date, ephemeral UI state
 ├── constants/              # Preset data, colors, config
 │   └── presets.ts          # 10 preset categories with activities
 ├── supabase/               # Supabase migrations, seed data, Edge Functions (Phase 3)
@@ -136,6 +141,32 @@ import { useQuery } from '@powersync/react';
 // Auto-updates when the categories table changes
 const { data: categories, isLoading } = useQuery('SELECT * FROM categories WHERE ...');
 ```
+
+## Implementation Progress
+
+### Completed
+- **Phase 1, Step 1:** Expo scaffold with tabs template, EAS dev build configured
+- **Phase 1, Step 2:** PowerSync database layer (schema, models, queries, seed)
+- **Timer hooks:** useTimer, useElapsedTime, useForgottenTimer, timezone utils, Zustand UI store
+- **Test Home screen:** Minimal activity list with start/stop/quick-switch (placeholder until real UI)
+
+### Next Up
+- **UI/UX designs** — User is working on wireframes/mockups (Google Stitch recommended)
+- **Phase 1, Step 3:** Home/Timer tab with final design
+- **Phase 1, Step 4:** Forgotten stop modal (bottom sheet with time picker)
+
+## Debugging
+
+### Inspect the SQLite database
+```bash
+# Find the DB file (path changes on reinstall)
+find ~/Library/Developer/CoreSimulator/Devices -name "habits.db" 2>/dev/null
+
+# Query entries via CLI
+sqlite3 "/path/to/habits.db" ".mode column" ".headers on" \
+  "SELECT te.id, a.name, c.name, te.started_at, te.ended_at FROM time_entries te JOIN activities a ON a.id = te.activity_id JOIN categories c ON c.id = a.category_id ORDER BY te.started_at DESC LIMIT 10;"
+```
+Or open with **DB Browser for SQLite** (GUI): File → Open → Cmd+Shift+G to paste the path.
 
 ## Important Constraints
 
