@@ -17,51 +17,66 @@ interface TimerCardProps {
 }
 
 export function TimerCard({ runningEntry, onStop, onStartPress }: TimerCardProps): React.ReactElement {
-  if (runningEntry) {
-    return (
-      <GlassCard>
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.sessionLabel}>Current Session</Text>
-            <Text style={styles.activityName}>{runningEntry.activityName}</Text>
-          </View>
-          <CategoryChip name={runningEntry.categoryName} color={runningEntry.categoryColor} />
-        </View>
-
-        <View style={styles.timerSection}>
-          <Text style={styles.timerDisplay}>
-            {formatTimerDisplay(runningEntry.elapsedSeconds)}
-          </Text>
-          <PulsingDots />
-        </View>
-
-        <View style={styles.stopRow}>
-          <StopButton onPress={onStop} />
-        </View>
-      </GlassCard>
-    );
-  }
+  const isActive = runningEntry !== null;
 
   return (
     <GlassCard>
-      <View style={styles.idleContent}>
-        <Feather name="clock" size={40} color={COLORS.onSurfaceVariant} />
-        <Text style={styles.idleTitle}>Ready to focus?</Text>
-        <Text style={styles.idleSubtitle}>Start tracking your time</Text>
-        <GradientButton
-          shape="pill"
-          label="Start Activity"
-          onPress={onStartPress}
-          style={styles.startButton}
+      <View style={styles.wrapper}>
+        {/* Active state — always in flow to define the card height */}
+        <View
+          style={{ opacity: isActive ? 1 : 0 }}
+          pointerEvents={isActive ? 'auto' : 'none'}
         >
-          <Feather name="play" size={18} color={COLORS.onPrimary} />
-        </GradientButton>
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.sessionLabel}>Current Session</Text>
+              <Text style={styles.activityName}>
+                {runningEntry?.activityName ?? ' '}
+              </Text>
+            </View>
+            <CategoryChip
+              name={runningEntry?.categoryName ?? ' '}
+              color={runningEntry?.categoryColor ?? COLORS.onSurfaceVariant}
+            />
+          </View>
+
+          <View style={styles.timerSection}>
+            <Text style={styles.timerDisplay}>
+              {formatTimerDisplay(runningEntry?.elapsedSeconds ?? 0)}
+            </Text>
+            <PulsingDots />
+          </View>
+
+          <View style={styles.stopRow}>
+            <StopButton onPress={onStop} />
+          </View>
+        </View>
+
+        {/* Idle state — absolute overlay, centered on top of active layout */}
+        {!isActive && (
+          <View style={styles.idleOverlay} pointerEvents="auto">
+            <Feather name="clock" size={40} color={COLORS.onSurfaceVariant} />
+            <Text style={styles.idleTitle}>Ready to focus?</Text>
+            <Text style={styles.idleSubtitle}>Start tracking your time</Text>
+            <GradientButton
+              shape="pill"
+              label="Start Activity"
+              onPress={onStartPress}
+              style={styles.startButton}
+            >
+              <Feather name="play" size={18} color={COLORS.onPrimary} />
+            </GradientButton>
+          </View>
+        )}
       </View>
     </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    position: 'relative',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -92,10 +107,11 @@ const styles = StyleSheet.create({
   stopRow: {
     alignItems: 'center',
   },
-  idleContent: {
+  idleOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
     alignItems: 'center',
     gap: SPACING.sm,
-    paddingVertical: SPACING.lg,
   },
   idleTitle: {
     ...TYPOGRAPHY.heading,
