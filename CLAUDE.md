@@ -35,6 +35,9 @@ Full implementation plan: `/Users/myozawwin/.claude/plans/ethereal-percolating-c
 - **State:** Zustand (ephemeral UI state only — all persistent data lives in PowerSync/SQLite)
 - **Notifications:** expo-notifications (local)
 - **UUID Generation:** `uuid` package via `@/lib/uuid` (`generateId()` helper)
+- **Fonts:** Manrope (headlines/display) + Plus Jakarta Sans (labels/body) via `@expo-google-fonts`
+- **Icons:** Feather icons from `@expo/vector-icons` (thin-stroke style)
+- **Gradients/Blur:** `expo-linear-gradient`, `expo-blur`
 
 ## Project Structure
 
@@ -60,7 +63,8 @@ habits-app/
 ├── hooks/                  # Custom React hooks
 │   ├── useTimer.ts         # Core timer hook (start/stop/switch via PowerSync useQuery)
 │   ├── useElapsedTime.ts   # Live-ticking elapsed seconds (recalculates from startedAt)
-│   └── useForgottenTimer.ts # Detects stale timers on app foreground (>2h or different day)
+│   ├── useForgottenTimer.ts # Detects stale timers on app foreground (>2h or different day)
+│   └── useCategoriesWithActivities.ts # Reactive grouped categories + activities
 ├── lib/                    # Library initializations
 │   ├── powersync.ts        # PowerSync DB instance (OPSqliteOpenFactory, local-only mode)
 │   ├── timezone.ts         # IANA timezone helpers (format, isToday, duration display)
@@ -68,6 +72,7 @@ habits-app/
 ├── store/                  # Zustand stores (UI state only)
 │   └── uiStore.ts          # Selected date, ephemeral UI state
 ├── constants/              # Preset data, colors, config
+│   ├── theme.ts            # Design system: COLORS, FONTS, TYPOGRAPHY, SPACING, RADIUS, SHADOWS
 │   └── presets.ts          # 10 preset categories with activities
 ├── supabase/               # Supabase migrations, seed data, Edge Functions (Phase 3)
 ├── babel.config.js         # Includes async generator plugin for PowerSync watched queries
@@ -115,7 +120,8 @@ npx expo start --clear
 - **Functional components** with hooks — no class components
 - **File naming:** kebab-case for files (`activity-picker.tsx`), PascalCase for components (`ActivityPicker`)
 - **Imports:** Use path aliases (`@/components/...`, `@/db/...`, `@/hooks/...`)
-- **Styling:** StyleSheet.create() — no inline styles except for dynamic values
+- **Styling:** StyleSheet.create() — no inline styles except for dynamic values. Use `COLORS`, `TYPOGRAPHY`, `SPACING`, `RADIUS` from `@/constants/theme`
+- **Design system:** "Fluid Chronometer" — no borders for sectioning (use background color shifts), tonal depth over structural lines. Designs in `design/` folder
 - **Error handling:** Always handle loading/error/empty states in UI components
 - **Database queries:** All PowerSync queries go through `db/queries.ts` — screens never write raw SQL
 - **UUID generation:** Always use `generateId()` from `@/lib/uuid` — `crypto.randomUUID()` is not available in React Native
@@ -135,6 +141,13 @@ One tap stops current activity and starts new one. No confirmation modal. Show t
 ### Forgotten stop detection
 On app foreground, check for `time_entries` where `ended_at IS NULL`. If found and stale (>2h or different day), show bottom sheet.
 
+### Reusable UI Components (`components/common/`)
+- **`GlassCard`** — Glassmorphism card wrapper (BlurView on iOS, rgba fallback on Android)
+- **`GradientButton`** — Primary CTA with linear gradient. `shape="pill"` for text buttons, `shape="circle"` for icon buttons (e.g., stop button)
+- **`CategoryChip`** — Colored pill showing category name with dot indicator
+- **`CategoryIcon`** — Maps preset icon strings (e.g., `'briefcase'`, `'heart'`) to Feather icons with fallbacks
+- **`PulsingDots`** — Animated dots indicator for active timer state
+
 ### Reactive queries
 ```typescript
 import { useQuery } from '@powersync/react';
@@ -148,11 +161,9 @@ const { data: categories, isLoading } = useQuery('SELECT * FROM categories WHERE
 - **Phase 1, Step 1:** Expo scaffold with tabs template, EAS dev build configured
 - **Phase 1, Step 2:** PowerSync database layer (schema, models, queries, seed)
 - **Timer hooks:** useTimer, useElapsedTime, useForgottenTimer, timezone utils, Zustand UI store
-- **Test Home screen:** Minimal activity list with start/stop/quick-switch (placeholder until real UI)
+- **Phase 1, Step 3:** Home/Timer tab — TimerCard (active/idle with consistent height), QuickSwitchSection (horizontal carousel), NewSessionModal (category filter, search, activity picker), tab layout with Feather icons
 
 ### Next Up
-- **UI/UX designs** — User is working on wireframes/mockups (Google Stitch recommended)
-- **Phase 1, Step 3:** Home/Timer tab with final design
 - **Phase 1, Step 4:** Forgotten stop modal (bottom sheet with time picker)
 
 ## Debugging
