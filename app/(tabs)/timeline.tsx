@@ -1,33 +1,36 @@
 import React from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { DateHeader } from '@/components/timeline/date-header';
+import { WeekStrip } from '@/components/timeline/week-strip';
 import { useTimelineData } from '@/hooks/useTimelineData';
 import { useUIStore } from '@/store/uiStore';
 import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
 import { formatDuration, formatTimeInTimezone } from '@/lib/timezone';
 
-export default function TabTwoScreen(): React.ReactElement {
+export default function TimelineScreen(): React.ReactElement {
   const selectedDate = useUIStore((s) => s.selectedDate);
-  const { items, isLoading, rangeStartMinutes, rangeEndMinutes, timezone } =
-    useTimelineData(selectedDate);
+  const setSelectedDate = useUIStore((s) => s.setSelectedDate);
+  const { items, isLoading, timezone } = useTimelineData(selectedDate);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.title}>Timeline Debug</Text>
-        <Text style={styles.subtitle}>
-          Date: {selectedDate} | TZ: {timezone}
-        </Text>
-        <Text style={styles.subtitle}>
-          Range: {Math.floor(rangeStartMinutes / 60)}:00 – {Math.floor(rangeEndMinutes / 60)}:00 | Items: {items.length}
-        </Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <DateHeader selectedDate={selectedDate} onDateChange={setSelectedDate} />
+      <WeekStrip selectedDate={selectedDate} onDateChange={setSelectedDate} />
 
+      <ScrollView contentContainerStyle={styles.scroll}>
         {isLoading && <ActivityIndicator style={styles.loader} color={COLORS.primary} />}
 
         {!isLoading && items.length === 0 && (
-          <Text style={styles.empty}>No entries for this day.</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyTitle}>No activity</Text>
+            <Text style={styles.emptySubtitle}>
+              Start a timer on the Focus tab to see entries here.
+            </Text>
+          </View>
         )}
 
+        {/* Temporary debug list — will be replaced by TimelineCanvas */}
         {items.map((item, index) => {
           if (item.type === 'entry') {
             const e = item.data;
@@ -52,11 +55,10 @@ export default function TabTwoScreen(): React.ReactElement {
             );
           }
 
-          // Gap
           const g = item.data;
           return (
             <View key={`gap-${index}`} style={styles.gapRow}>
-              <Text style={styles.gapLabel}>GAP</Text>
+              <Text style={styles.gapLabel}>Untracked</Text>
               <Text style={styles.timeRange}>
                 {formatTimeInTimezone(g.startedAt.toISOString(), timezone)}
                 {' → '}
@@ -77,27 +79,26 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   scroll: {
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
     paddingBottom: 100,
-  },
-  title: {
-    ...TYPOGRAPHY.headingXl,
-    color: COLORS.onSurface,
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    color: COLORS.onSurfaceVariant,
-    marginBottom: SPACING.sm,
   },
   loader: {
     marginTop: SPACING['3xl'],
   },
-  empty: {
-    ...TYPOGRAPHY.body,
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: SPACING['5xl'],
+  },
+  emptyTitle: {
+    ...TYPOGRAPHY.heading,
     color: COLORS.onSurfaceVariant,
-    marginTop: SPACING['3xl'],
+    marginBottom: SPACING.sm,
+  },
+  emptySubtitle: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.outlineVariant,
     textAlign: 'center',
+    paddingHorizontal: SPACING['3xl'],
   },
   row: {
     backgroundColor: COLORS.surfaceContainerLow,

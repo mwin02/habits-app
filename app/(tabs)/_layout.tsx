@@ -27,11 +27,11 @@ export default function TabLayout(): React.ReactElement {
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="timeline"
         options={{
-          title: 'History',
+          title: 'Timeline',
           tabBarIcon: ({ color, size }) => (
-            <Feather name="list" size={size} color={color} />
+            <Feather name="calendar" size={size} color={color} />
           ),
         }}
       />
