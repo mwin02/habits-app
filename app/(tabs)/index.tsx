@@ -1,7 +1,10 @@
+import { ForgottenTimerModal } from "@/components/timer/forgotten-timer-modal";
 import { TimerCard } from "@/components/timer/timer-card";
 import { QuickSwitchSection } from "@/components/timer/quick-switch-section";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import { endForgottenEntry, deleteEntry } from "@/db/queries";
 import { useTimer } from "@/hooks/useTimer";
+import { useForgottenTimer } from "@/hooks/useForgottenTimer";
 import { useCategoriesWithActivities } from "@/hooks/useCategoriesWithActivities";
 import { NewSessionModal } from "@/components/timer/new-session-modal";
 import React, { useCallback, useState } from "react";
@@ -24,7 +27,25 @@ export default function HomeScreen(): React.ReactElement {
   } = useTimer();
   const { categories, isLoading: categoriesLoading } =
     useCategoriesWithActivities();
+  const { forgottenEntry, dismissForgotten } = useForgottenTimer();
   const [modalVisible, setModalVisible] = useState(false);
+
+  const handleForgottenStop = useCallback(
+    async (endedAt: Date): Promise<void> => {
+      if (forgottenEntry) {
+        await endForgottenEntry(forgottenEntry.entryId, endedAt);
+        dismissForgotten();
+      }
+    },
+    [forgottenEntry, dismissForgotten],
+  );
+
+  const handleForgottenDiscard = useCallback(async (): Promise<void> => {
+    if (forgottenEntry) {
+      await deleteEntry(forgottenEntry.entryId);
+      dismissForgotten();
+    }
+  }, [forgottenEntry, dismissForgotten]);
 
   const handleActivityPress = useCallback(
     async (activityId: string): Promise<void> => {
@@ -93,6 +114,14 @@ export default function HomeScreen(): React.ReactElement {
         onClose={() => setModalVisible(false)}
         onStartActivity={handleStartFromModal}
         categories={categories}
+      />
+
+      {/* Forgotten Timer Modal */}
+      <ForgottenTimerModal
+        entry={forgottenEntry}
+        onConfirmStop={handleForgottenStop}
+        onDismiss={dismissForgotten}
+        onDiscard={handleForgottenDiscard}
       />
     </SafeAreaView>
   );

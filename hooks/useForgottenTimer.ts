@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
-import { useQuery } from '@powersync/react';
-import type { RunningTimer } from '@/db/models';
-import { getCurrentTimezone, isToday } from '@/lib/timezone';
+import type { RunningTimer } from "@/db/models";
+import { getCurrentTimezone, isToday } from "@/lib/timezone";
+import { useQuery } from "@powersync/react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, type AppStateStatus } from "react-native";
 
 /**
  * SQL query to get the running entry with enriched data (same as useTimer).
@@ -12,6 +12,7 @@ const RUNNING_ENTRY_QUERY = `
     te.id          AS entry_id,
     te.activity_id AS activity_id,
     te.started_at  AS started_at,
+    te.timezone    AS timezone,
     a.name         AS activity_name,
     c.name         AS category_name,
     c.color        AS category_color
@@ -28,6 +29,7 @@ interface RunningEntryRow {
   entry_id: string;
   activity_id: string;
   started_at: string;
+  timezone: string;
   activity_name: string;
   category_name: string;
   category_color: string;
@@ -61,10 +63,10 @@ export function useForgottenTimer(): UseForgottenTimerResult {
 
   // Listen for app state changes (background → active)
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
       if (
         appStateRef.current.match(/inactive|background/) &&
-        nextState === 'active'
+        nextState === "active"
       ) {
         // App came to foreground — re-check for forgotten timers
         setShouldCheck(true);
@@ -100,6 +102,7 @@ export function useForgottenTimer(): UseForgottenTimerResult {
       categoryColor: row.category_color,
       startedAt,
       elapsedSeconds,
+      timezone: row.timezone,
     };
   })();
 

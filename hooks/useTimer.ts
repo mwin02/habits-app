@@ -14,6 +14,7 @@ const RUNNING_ENTRY_QUERY = `
     te.id          AS entry_id,
     te.activity_id AS activity_id,
     te.started_at  AS started_at,
+    te.timezone    AS timezone,
     a.name         AS activity_name,
     c.name         AS category_name,
     c.color        AS category_color
@@ -30,6 +31,7 @@ interface RunningEntryRow {
   entry_id: string;
   activity_id: string;
   started_at: string;
+  timezone: string;
   activity_name: string;
   category_name: string;
   category_color: string;
@@ -77,6 +79,7 @@ export function useTimer(): UseTimerResult {
       categoryColor: row.category_color,
       startedAt: new Date(row.started_at),
       elapsedSeconds,
+      timezone: row.timezone,
     };
   }, [row, elapsedSeconds]);
 

@@ -45,6 +45,7 @@ export interface RunningTimer {
   categoryColor: string;
   startedAt: Date;
   elapsedSeconds: number;
+  timezone: string;
 }
 
 /** A time entry as displayed on the timeline */
