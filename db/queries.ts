@@ -291,6 +291,23 @@ export async function updateEntryNote(entryId: string, note: string | null): Pro
   );
 }
 
+/** Update start/end times of a time entry, recalculating duration */
+export async function updateEntryTimes(
+  entryId: string,
+  startedAt: Date,
+  endedAt: Date,
+): Promise<void> {
+  const startStr = startedAt.toISOString();
+  const endStr = endedAt.toISOString();
+  const durationSeconds = Math.round(
+    (endedAt.getTime() - startedAt.getTime()) / 1000,
+  );
+  await db.execute(
+    'UPDATE time_entries SET started_at = ?, ended_at = ?, duration_seconds = ?, updated_at = ? WHERE id = ?',
+    [startStr, endStr, durationSeconds, nowUTC(), entryId],
+  );
+}
+
 /** Soft-delete a time entry */
 export async function deleteEntry(entryId: string): Promise<void> {
   await db.execute(

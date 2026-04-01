@@ -222,6 +222,7 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
           durationSeconds,
           note: row.note,
           source: row.source as TimeEntrySource,
+          timezone: row.timezone,
           clampedStart,
           clampedEnd,
         };

@@ -59,6 +59,7 @@ export interface TimelineEntry {
   durationSeconds: number | null;
   note: string | null;
   source: TimeEntrySource;
+  timezone: string;
 }
 
 /** A gap in the timeline (untracked time) */
