@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DateHeader } from '@/components/timeline/date-header';
 import { EntryDetailModal } from '@/components/timeline/entry-detail-modal';
@@ -9,7 +9,7 @@ import { TimelineCanvas } from '@/components/timeline/timeline-canvas';
 import type { TimelineEntryData } from '@/hooks/useTimelineData';
 import { useTimelineData } from '@/hooks/useTimelineData';
 import { useUIStore } from '@/store/uiStore';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, SPACING } from '@/constants/theme';
 
 export default function TimelineScreen(): React.ReactElement {
   const selectedDate = useUIStore((s) => s.selectedDate);
@@ -59,13 +59,6 @@ export default function TimelineScreen(): React.ReactElement {
 
       {isLoading ? (
         <ActivityIndicator style={styles.loader} color={COLORS.primary} />
-      ) : items.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>No activity</Text>
-          <Text style={styles.emptySubtitle}>
-            Start a timer on the Focus tab to see entries here.
-          </Text>
-        </View>
       ) : (
         <TimelineCanvas
           items={items}
@@ -91,22 +84,5 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: SPACING['3xl'],
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: SPACING['5xl'],
-  },
-  emptyTitle: {
-    ...TYPOGRAPHY.heading,
-    color: COLORS.onSurfaceVariant,
-    marginBottom: SPACING.sm,
-  },
-  emptySubtitle: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.outlineVariant,
-    textAlign: 'center',
-    paddingHorizontal: SPACING['3xl'],
   },
 });
