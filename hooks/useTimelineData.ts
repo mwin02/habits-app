@@ -1,21 +1,18 @@
-import { useMemo } from 'react';
-import { useQuery } from '@powersync/react';
-import {
-  TIMELINE_ENTRIES_QUERY,
-  type TimelineEntryRow,
-} from '@/db/queries';
-import type { TimelineEntry, TimelineGap, TimeEntrySource } from '@/db/models';
-import {
-  getCurrentTimezone,
-  getTodayDate,
-} from '@/lib/timezone';
+import type { TimeEntrySource, TimelineEntry, TimelineGap } from "@/db/models";
+import { TIMELINE_ENTRIES_QUERY, type TimelineEntryRow } from "@/db/queries";
+import { getCurrentTimezone, getTodayDate } from "@/lib/timezone";
+import { useQuery } from "@powersync/react";
+import { useMemo } from "react";
 
 // ──────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────
 
 /** An entry with extra fields for timeline display */
-export type TimelineEntryData = TimelineEntry & { activityId: string; categoryIcon: string | null };
+export type TimelineEntryData = TimelineEntry & {
+  activityId: string;
+  categoryIcon: string | null;
+};
 
 /** A cluster of consecutive short entries */
 export interface TimelineCluster {
@@ -26,9 +23,9 @@ export interface TimelineCluster {
 }
 
 export type TimelineItem =
-  | { type: 'entry'; data: TimelineEntryData }
-  | { type: 'gap'; data: TimelineGap }
-  | { type: 'cluster'; data: TimelineCluster };
+  | { type: "entry"; data: TimelineEntryData }
+  | { type: "gap"; data: TimelineGap }
+  | { type: "cluster"; data: TimelineCluster };
 
 export interface UseTimelineDataResult {
   /** Sorted items (entries + gaps) for the selected day */
@@ -58,7 +55,7 @@ const MIN_CLUSTER_SIZE = 2;
 
 /** Default axis range when there are no entries */
 const DEFAULT_RANGE_START_HOUR = 6; // 6 AM
-const DEFAULT_RANGE_END_HOUR = 22;  // 10 PM
+const DEFAULT_RANGE_END_HOUR = 22; // 10 PM
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -66,15 +63,18 @@ const DEFAULT_RANGE_END_HOUR = 22;  // 10 PM
 
 /** Get minutes since midnight for a Date in a given timezone */
 export function minutesSinceMidnight(date: Date, timezone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
-    hour: 'numeric',
-    minute: 'numeric',
+    hour: "numeric",
+    minute: "numeric",
     hour12: false,
   }).formatToParts(date);
 
-  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
-  const minute = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  const minute = parseInt(
+    parts.find((p) => p.type === "minute")?.value ?? "0",
+    10,
+  );
   // Intl may return hour 24 for midnight — treat as 0
   return (hour === 24 ? 0 : hour) * 60 + minute;
 }
@@ -94,6 +94,24 @@ function floorToHour(minutes: number): number {
 /** Round minutes up to the nearest hour */
 function ceilToHour(minutes: number): number {
   return Math.ceil(minutes / 60) * 60;
+}
+
+/**
+ * Convert local minutes-since-midnight to a UTC Date for a given day.
+ *
+ * `dayStartUTC` is the naive UTC midnight (e.g., `2026-04-01T00:00:00Z`).
+ * We compute the timezone offset by checking what local time `dayStartUTC`
+ * represents, then subtract that offset to map local minutes → UTC.
+ */
+function localMinutesToDate(
+  localMinutes: number,
+  dayStartUTC: Date,
+  timezone: string,
+): Date {
+  const utcMidnightAsLocalMinutes = minutesSinceMidnight(dayStartUTC, timezone);
+  return new Date(
+    dayStartUTC.getTime() + (localMinutes - utcMidnightAsLocalMinutes) * 60_000,
+  );
 }
 
 // ──────────────────────────────────────────────
@@ -118,7 +136,7 @@ function clusterShortEntries(items: TimelineItem[]): TimelineItem[] {
         0,
       );
       result.push({
-        type: 'cluster',
+        type: "cluster",
         data: {
           entries: pendingShort,
           startedAt: first.startedAt,
@@ -129,14 +147,14 @@ function clusterShortEntries(items: TimelineItem[]): TimelineItem[] {
     } else {
       // Not enough to cluster — emit individually
       for (const entry of pendingShort) {
-        result.push({ type: 'entry', data: entry });
+        result.push({ type: "entry", data: entry });
       }
     }
     pendingShort = [];
   };
 
   for (const item of items) {
-    if (item.type === 'entry') {
+    if (item.type === "entry") {
       const duration = item.data.durationSeconds ?? 0;
       if (duration < SHORT_ENTRY_THRESHOLD_SECONDS) {
         pendingShort.push(item.data);
@@ -196,98 +214,138 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
     const effectiveDayEnd = isToday && now < dayEnd ? now : dayEnd;
 
     // Transform rows into TimelineEntry objects, clamping to day boundaries
-    const entries: (TimelineEntry & { activityId: string; categoryIcon: string | null; clampedStart: Date; clampedEnd: Date })[] =
-      rows.map((row) => {
-        const startedAt = new Date(row.started_at);
-        const endedAt = row.ended_at ? new Date(row.ended_at) : (isToday ? now : null);
+    const entries: (TimelineEntry & {
+      activityId: string;
+      categoryIcon: string | null;
+      clampedStart: Date;
+      clampedEnd: Date;
+    })[] = rows.map((row) => {
+      const startedAt = new Date(row.started_at);
+      const endedAt = row.ended_at
+        ? new Date(row.ended_at)
+        : isToday
+          ? now
+          : null;
 
-        const clampedStart = clampDate(startedAt, dayStart, dayEnd);
-        const clampedEnd = endedAt
-          ? clampDate(endedAt, dayStart, dayEnd)
-          : effectiveDayEnd;
+      const clampedStart = clampDate(startedAt, dayStart, dayEnd);
+      const clampedEnd = endedAt
+        ? clampDate(endedAt, dayStart, dayEnd)
+        : effectiveDayEnd;
 
-        const durationSeconds = row.ended_at
-          ? row.duration_seconds
-          : Math.round((clampedEnd.getTime() - clampedStart.getTime()) / 1000);
+      const durationSeconds = row.ended_at
+        ? row.duration_seconds
+        : Math.round((clampedEnd.getTime() - clampedStart.getTime()) / 1000);
 
-        return {
-          id: row.entry_id,
-          activityId: row.activity_id,
-          activityName: row.activity_name,
-          categoryName: row.category_name,
-          categoryColor: row.category_color,
-          categoryIcon: row.category_icon,
-          startedAt: clampedStart,
-          endedAt: clampedEnd,
-          durationSeconds,
-          note: row.note,
-          source: row.source as TimeEntrySource,
-          timezone: row.timezone,
-          clampedStart,
-          clampedEnd,
-        };
-      });
+      return {
+        id: row.entry_id,
+        activityId: row.activity_id,
+        activityName: row.activity_name,
+        categoryName: row.category_name,
+        categoryColor: row.category_color,
+        categoryIcon: row.category_icon,
+        startedAt: clampedStart,
+        endedAt: clampedEnd,
+        durationSeconds,
+        note: row.note,
+        source: row.source as TimeEntrySource,
+        timezone: row.timezone,
+        clampedStart,
+        clampedEnd,
+      };
+    });
 
     // Sort by clamped start time
     entries.sort((a, b) => a.clampedStart.getTime() - b.clampedStart.getTime());
 
-    // Build interleaved items list with gaps
-    const items: TimelineItem[] = [];
-
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-
-      // Check for gap before this entry
-      const prevEnd = i === 0 ? null : entries[i - 1].clampedEnd;
-      if (prevEnd && entry.clampedStart.getTime() - prevEnd.getTime() > MIN_GAP_SECONDS * 1000) {
-        const gapDuration = Math.round(
-          (entry.clampedStart.getTime() - prevEnd.getTime()) / 1000,
-        );
-        items.push({
-          type: 'gap',
-          data: {
-            startedAt: prevEnd,
-            endedAt: entry.clampedStart,
-            durationSeconds: gapDuration,
-          },
-        });
-      }
-
-      // Add the entry (strip clamped helper fields)
-      const { clampedStart: _cs, clampedEnd: _ce, ...entryData } = entry;
-      items.push({ type: 'entry', data: entryData });
-    }
-
-    // Cluster consecutive short entries to prevent overlap
-    const clusteredItems = clusterShortEntries(items);
-
-    // Compute axis range
-    let rangeStartMinutes: number;
+    // Fixed axis range: always 6 AM – midnight (or current time + 1h for today)
+    // Expand if entries fall outside this range
+    let rangeStartMinutes = DEFAULT_RANGE_START_HOUR * 60; // 6 AM
     let rangeEndMinutes: number;
 
-    if (entries.length === 0) {
-      rangeStartMinutes = DEFAULT_RANGE_START_HOUR * 60;
-      rangeEndMinutes = DEFAULT_RANGE_END_HOUR * 60;
+    if (isToday) {
+      const nowMinutes = minutesSinceMidnight(now, timezone);
+      rangeEndMinutes = Math.min(24 * 60, ceilToHour(nowMinutes) + 60);
     } else {
-      const firstStart = minutesSinceMidnight(entries[0].clampedStart, timezone);
+      rangeEndMinutes = 24 * 60; // midnight
+    }
+
+    // If entries exist outside the default range, expand to include them
+    if (entries.length > 0) {
+      const firstStart = minutesSinceMidnight(
+        entries[0].clampedStart,
+        timezone,
+      );
       const lastEnd = minutesSinceMidnight(
         entries[entries.length - 1].clampedEnd,
         timezone,
       );
-
-      // Round to hour boundaries with 1h padding
-      rangeStartMinutes = Math.max(0, floorToHour(firstStart) - 60);
-      rangeEndMinutes = Math.min(24 * 60, ceilToHour(lastEnd) + 60);
-
-      // If today, ensure range extends to at least current time + 1h
-      if (isToday) {
-        const nowMinutes = minutesSinceMidnight(now, timezone);
-        rangeEndMinutes = Math.min(
-          24 * 60,
-          Math.max(rangeEndMinutes, ceilToHour(nowMinutes) + 60),
-        );
-      }
+      rangeStartMinutes = Math.min(
+        rangeStartMinutes,
+        Math.max(0, floorToHour(firstStart) - 60),
+      );
+      rangeEndMinutes = Math.max(
+        rangeEndMinutes,
+        Math.min(24 * 60, ceilToHour(lastEnd) + 60),
+      );
     }
+
+    // Compute gap boundary dates using timezone-aware conversion
+    const gapRangeStart = localMinutesToDate(
+      rangeStartMinutes,
+      dayStart,
+      timezone,
+    );
+    // End of gap range: midnight local (24*60 = 1440 min) or current time for today
+    const midnightLocal = localMinutesToDate(24 * 60 - 1, dayStart, timezone);
+    const gapRangeEnd = isToday
+      ? effectiveDayEnd < midnightLocal
+        ? effectiveDayEnd
+        : midnightLocal
+      : midnightLocal;
+
+    // Build interleaved items list with gaps (including leading/trailing)
+    const items: TimelineItem[] = [];
+
+    /** Helper to push a gap if duration is significant */
+    const pushGap = (start: Date, end: Date): void => {
+      // Clamp end to local midnight — don't go past the selected day
+      const cappedEnd = end > midnightLocal ? midnightLocal : end;
+      if (cappedEnd <= start) return;
+      const dur = Math.round((cappedEnd.getTime() - start.getTime()) / 1000);
+      if (dur > MIN_GAP_SECONDS) {
+        items.push({
+          type: "gap",
+          data: { startedAt: start, endedAt: cappedEnd, durationSeconds: dur },
+        });
+      }
+    };
+
+    if (entries.length === 0) {
+      // No entries — single gap covering the visible range
+      pushGap(gapRangeStart, gapRangeEnd);
+    } else {
+      // Leading gap: from range start to first entry
+      pushGap(gapRangeStart, entries[0].clampedStart);
+
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+
+        // Gap between previous entry and this one
+        if (i > 0) {
+          pushGap(entries[i - 1].clampedEnd, entry.clampedStart);
+        }
+
+        // Add the entry (strip clamped helper fields)
+        const { clampedStart: _cs, clampedEnd: _ce, ...entryData } = entry;
+        items.push({ type: "entry", data: entryData });
+      }
+
+      // Trailing gap: from last entry to range end (clamped to midnight)
+      pushGap(entries[entries.length - 1].clampedEnd, gapRangeEnd);
+    }
+
+    // Cluster consecutive short entries to prevent overlap
+    const clusteredItems = clusterShortEntries(items);
 
     return { items: clusteredItems, rangeStartMinutes, rangeEndMinutes };
   }, [rows, startOfDayUTC, endOfDayUTC, selectedDate, timezone]);
