@@ -10,6 +10,7 @@ interface ClusterBlockProps {
   cluster: TimelineCluster;
   height: number;
   expanded: boolean;
+  compact?: boolean;
   onToggle: () => void;
   onEntryPress: (entryId: string) => void;
 }
@@ -18,6 +19,7 @@ export function ClusterBlock({
   cluster,
   height,
   expanded,
+  compact = false,
   onToggle,
   onEntryPress,
 }: ClusterBlockProps): React.ReactElement {
@@ -79,19 +81,23 @@ export function ClusterBlock({
     >
       <View style={styles.collapsedContent}>
         <View style={styles.dotRow}>
-          {uniqueColors.slice(0, 4).map((color) => (
+          {uniqueColors.slice(0, compact ? 2 : 4).map((color) => (
             <View
               key={color}
               style={[styles.colorDot, { backgroundColor: color }]}
             />
           ))}
         </View>
-        <Text style={styles.summaryText}>
-          {cluster.entries.length} activities
+        <Text style={styles.summaryText} numberOfLines={1}>
+          {compact
+            ? `${cluster.entries.length}`
+            : `${cluster.entries.length} activities`}
         </Text>
-        <Text style={styles.summaryDuration}>
-          {formatDuration(cluster.totalDurationSeconds)}
-        </Text>
+        {!compact && (
+          <Text style={styles.summaryDuration}>
+            {formatDuration(cluster.totalDurationSeconds)}
+          </Text>
+        )}
       </View>
       <Feather
         name="chevron-down"

@@ -5,7 +5,7 @@ import {
 } from "@/hooks/useTimelineData";
 import { getCurrentTimezone, getTodayDate } from "@/lib/timezone";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ClusterBlock } from "./cluster-block";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { GapBlock } from "./gap-block";
@@ -30,6 +30,21 @@ interface TimelineCanvasProps {
   selectedDate: string;
   onEntryPress: (entryId: string) => void;
   onGapPress: (startedAt: Date, endedAt: Date) => void;
+}
+
+const COLUMN_GAP = 4;
+
+/** Compute left/width style for a column in a multi-column overlap group */
+function getColumnStyle(
+  totalColumns: number,
+  columnIndex: number,
+): { left: number; width: number } {
+  const screenWidth = Dimensions.get("window").width;
+  const availableWidth = screenWidth - BLOCK_LEFT - SPACING.lg;
+  const totalGaps = (totalColumns - 1) * COLUMN_GAP;
+  const colWidth = (availableWidth - totalGaps) / totalColumns;
+  const left = BLOCK_LEFT + columnIndex * (colWidth + COLUMN_GAP);
+  return { left, width: colWidth };
 }
 
 /** Format hour number to label: 0 → "12 AM", 8 → "8 AM", 13 → "1 PM" */
@@ -103,11 +118,10 @@ export function TimelineCanvas({
     [timezone],
   );
 
-  // Resolve block positions with collision push-down
+  // Resolve block positions with overlap detection for side-by-side layout
   const resolvedPositions = useMemo(() => {
-    const positions: { top: number; height: number }[] = [];
-    let prevBottom = -Infinity;
-
+    // Step 1: Compute natural positions for all items
+    const natural: { top: number; height: number; bottom: number }[] = [];
     for (const item of items) {
       let startDate: Date;
       let endDate: Date;
@@ -123,12 +137,116 @@ export function TimelineCanvas({
         endDate = item.data.endedAt;
       }
 
-      const naturalTop = getTop(startDate);
+      const top = getTop(startDate);
       const height = getHeight(startDate, endDate);
-      const resolvedTop = Math.max(naturalTop, prevBottom + BLOCK_GAP);
-      prevBottom = resolvedTop + height;
+      natural.push({ top, height, bottom: top + height });
+    }
 
-      positions.push({ top: resolvedTop, height });
+    // Step 2: Find overlap groups among non-gap items only
+    // Gaps are excluded — they represent untracked time and never overlap with entries
+    const groupIndex = new Array<number>(items.length).fill(-1);
+    let currentGroup = 0;
+
+    for (let i = 0; i < items.length; i++) {
+      // Skip gaps — they don't participate in overlap detection
+      if (items[i].type === "gap") continue;
+
+      if (groupIndex[i] === -1) {
+        groupIndex[i] = currentGroup;
+        let groupBottom = natural[i].bottom;
+
+        for (let j = i + 1; j < items.length; j++) {
+          if (items[j].type === "gap") continue;
+          if (natural[j].top < groupBottom) {
+            groupIndex[j] = currentGroup;
+            groupBottom = Math.max(groupBottom, natural[j].bottom);
+          } else {
+            break;
+          }
+        }
+        currentGroup++;
+      }
+    }
+
+    // Step 3: Within each group, assign columns using a greedy algorithm
+    const columnAssignment = new Array<number>(items.length).fill(0);
+    const totalColumnsPerGroup = new Map<number, number>();
+
+    const groups = new Map<number, number[]>();
+    for (let i = 0; i < items.length; i++) {
+      if (groupIndex[i] === -1) continue; // gaps
+      const g = groupIndex[i];
+      if (!groups.has(g)) groups.set(g, []);
+      groups.get(g)!.push(i);
+    }
+
+    for (const [g, members] of groups) {
+      if (members.length === 1) {
+        columnAssignment[members[0]] = 0;
+        totalColumnsPerGroup.set(g, 1);
+        continue;
+      }
+
+      const columnBottoms: number[] = [];
+      for (const idx of members) {
+        let placed = false;
+        for (let col = 0; col < columnBottoms.length; col++) {
+          if (natural[idx].top >= columnBottoms[col]) {
+            columnAssignment[idx] = col;
+            columnBottoms[col] = natural[idx].bottom;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          columnAssignment[idx] = columnBottoms.length;
+          columnBottoms.push(natural[idx].bottom);
+        }
+      }
+
+      totalColumnsPerGroup.set(g, columnBottoms.length);
+    }
+
+    // Step 4: Build final positions
+    const positions: {
+      top: number;
+      height: number;
+      columnIndex: number;
+      totalColumns: number;
+    }[] = [];
+
+    let prevBottom = -Infinity;
+
+    for (let i = 0; i < items.length; i++) {
+      const height = natural[i].height;
+      let top: number;
+      let colIndex = 0;
+      let totalCols = 1;
+
+      if (items[i].type === "gap") {
+        // Gaps always get full-width push-down layout
+        top = Math.max(natural[i].top, prevBottom + BLOCK_GAP);
+      } else {
+        const g = groupIndex[i];
+        totalCols = totalColumnsPerGroup.get(g) ?? 1;
+        const isOverlapping = totalCols > 1;
+
+        if (isOverlapping) {
+          top = natural[i].top;
+          colIndex = columnAssignment[i];
+        } else {
+          top = Math.max(natural[i].top, prevBottom + BLOCK_GAP);
+        }
+      }
+
+      prevBottom = Math.max(prevBottom, top + height);
+
+      positions.push({
+        top,
+        height,
+        columnIndex: colIndex,
+        totalColumns: totalCols,
+      });
     }
 
     return positions;
@@ -174,17 +292,18 @@ export function TimelineCanvas({
 
       {/* Entry, gap, and cluster blocks */}
       {items.map((item, index) => {
-        const { top, height } = resolvedPositions[index];
+        const { top, height, columnIndex, totalColumns } = resolvedPositions[index];
 
         if (item.type === "entry") {
           const e = item.data;
+          const entryStyle =
+            totalColumns > 1
+              ? getColumnStyle(totalColumns, columnIndex)
+              : { left: BLOCK_LEFT, right: SPACING.lg };
           return (
             <View
               key={e.id}
-              style={[
-                styles.blockWrapper,
-                { top, height, left: BLOCK_LEFT, right: SPACING.lg },
-              ]}
+              style={[styles.blockWrapper, { top, height }, entryStyle]}
             >
               <TimelineBlock
                 activityName={e.activityName}
@@ -204,6 +323,10 @@ export function TimelineCanvas({
         if (item.type === "cluster") {
           const c = item.data;
           const isExpanded = expandedClusterIndex === index;
+          const clusterPosStyle =
+            totalColumns > 1
+              ? getColumnStyle(totalColumns, columnIndex)
+              : { left: BLOCK_LEFT, right: SPACING.lg };
           return (
             <View
               key={`cluster-${index}`}
@@ -212,16 +335,16 @@ export function TimelineCanvas({
                 {
                   top,
                   minHeight: height,
-                  left: BLOCK_LEFT,
-                  right: SPACING.lg,
                   zIndex: isExpanded ? 20 : 5,
                 },
+                clusterPosStyle,
               ]}
             >
               <ClusterBlock
                 cluster={c}
                 height={height}
                 expanded={isExpanded}
+                compact={totalColumns > 1}
                 onToggle={() =>
                   setExpandedClusterIndex(isExpanded ? null : index)
                 }
@@ -231,7 +354,7 @@ export function TimelineCanvas({
           );
         }
 
-        // Gap
+        // Gap — always full width
         const g = item.data;
         return (
           <View
