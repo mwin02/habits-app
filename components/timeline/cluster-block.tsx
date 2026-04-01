@@ -3,30 +3,28 @@ import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import type { TimelineCluster } from "@/hooks/useTimelineData";
 import { formatDuration } from "@/lib/timezone";
 import { Feather } from "@expo/vector-icons";
-import React, { useCallback, useState } from "react";
+import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface ClusterBlockProps {
   cluster: TimelineCluster;
   height: number;
+  expanded: boolean;
+  onToggle: () => void;
   onEntryPress: (entryId: string) => void;
 }
 
 export function ClusterBlock({
   cluster,
   height,
+  expanded,
+  onToggle,
   onEntryPress,
 }: ClusterBlockProps): React.ReactElement {
-  const [expanded, setExpanded] = useState(false);
-
-  const toggleExpanded = useCallback(() => {
-    setExpanded((prev) => !prev);
-  }, []);
-
   if (expanded) {
     return (
       <View style={styles.expandedContainer}>
-        <Pressable onPress={toggleExpanded} style={styles.collapseHeader}>
+        <Pressable onPress={onToggle} style={styles.collapseHeader}>
           <Text style={styles.collapseLabel}>
             {cluster.entries.length} activities
           </Text>
@@ -72,7 +70,7 @@ export function ClusterBlock({
 
   return (
     <Pressable
-      onPress={toggleExpanded}
+      onPress={onToggle}
       style={({ pressed }) => [
         styles.collapsedContainer,
         { height },

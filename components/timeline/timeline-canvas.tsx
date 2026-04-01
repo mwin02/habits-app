@@ -51,6 +51,9 @@ export function TimelineCanvas({
 }: TimelineCanvasProps): React.ReactElement {
   const isToday = selectedDate === getTodayDate(getCurrentTimezone());
 
+  // Only one cluster can be expanded at a time
+  const [expandedClusterIndex, setExpandedClusterIndex] = useState<number | null>(null);
+
   // Current time position (re-renders every 30s for today)
   const [nowMinutes, setNowMinutes] = useState(() =>
     minutesSinceMidnight(new Date(), timezone),
@@ -200,6 +203,7 @@ export function TimelineCanvas({
 
         if (item.type === "cluster") {
           const c = item.data;
+          const isExpanded = expandedClusterIndex === index;
           return (
             <View
               key={`cluster-${index}`}
@@ -210,13 +214,17 @@ export function TimelineCanvas({
                   minHeight: height,
                   left: BLOCK_LEFT,
                   right: SPACING.lg,
-                  zIndex: 5,
+                  zIndex: isExpanded ? 20 : 5,
                 },
               ]}
             >
               <ClusterBlock
                 cluster={c}
                 height={height}
+                expanded={isExpanded}
+                onToggle={() =>
+                  setExpandedClusterIndex(isExpanded ? null : index)
+                }
                 onEntryPress={onEntryPress}
               />
             </View>
