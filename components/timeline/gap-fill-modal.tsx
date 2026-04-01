@@ -1,5 +1,4 @@
 import { CategoryChip } from "@/components/common/category-chip";
-import { GradientButton } from "@/components/common/gradient-button";
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { createRetroactiveEntry } from "@/db/queries";
 import {
@@ -11,10 +10,12 @@ import {
   getCurrentTimezone,
 } from "@/lib/timezone";
 import { Feather } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState } from "react";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +29,8 @@ interface GapFillModalProps {
   onClose: () => void;
 }
 
+type ActivePicker = "start" | "end" | null;
+
 export function GapFillModal({
   gap,
   onClose,
@@ -36,8 +39,21 @@ export function GapFillModal({
   const { categories } = useCategoriesWithActivities();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editedStart, setEditedStart] = useState<Date>(new Date());
+  const [editedEnd, setEditedEnd] = useState<Date>(new Date());
+  const [activePicker, setActivePicker] = useState<ActivePicker>(null);
 
   const timezone = getCurrentTimezone();
+
+  // Reset times when gap changes
+  useEffect(() => {
+    if (gap) {
+      setEditedStart(gap.startedAt);
+      setEditedEnd(gap.endedAt);
+      setActivePicker(null);
+      setSelectedCategoryId(null);
+    }
+  }, [gap?.startedAt.getTime(), gap?.endedAt.getTime()]);
 
   const filteredActivities = useMemo(() => {
     if (!selectedCategoryId) {
@@ -47,6 +63,27 @@ export function GapFillModal({
     return category?.activities ?? [];
   }, [categories, selectedCategoryId]);
 
+  const handleStartChange = useCallback(
+    (_event: unknown, date?: Date): void => {
+      if (date) setEditedStart(date);
+    },
+    [],
+  );
+
+  const handleEndChange = useCallback(
+    (_event: unknown, date?: Date): void => {
+      if (date) setEditedEnd(date);
+    },
+    [],
+  );
+
+  const handleTogglePicker = useCallback(
+    (picker: "start" | "end"): void => {
+      setActivePicker((prev) => (prev === picker ? null : picker));
+    },
+    [],
+  );
+
   const handleSelectActivity = useCallback(
     async (activityId: string): Promise<void> => {
       if (!gap || saving) return;
@@ -54,8 +91,8 @@ export function GapFillModal({
       try {
         await createRetroactiveEntry({
           activityId,
-          startedAt: gap.startedAt,
-          endedAt: gap.endedAt,
+          startedAt: editedStart,
+          endedAt: editedEnd,
           timezone,
         });
         onClose();
@@ -63,16 +100,27 @@ export function GapFillModal({
         setSaving(false);
       }
     },
-    [gap, timezone, onClose, saving],
+    [gap, editedStart, editedEnd, timezone, onClose, saving],
   );
 
   if (!gap) return null;
 
   const durationSeconds = Math.round(
-    (gap.endedAt.getTime() - gap.startedAt.getTime()) / 1000,
+    (editedEnd.getTime() - editedStart.getTime()) / 1000,
   );
-  const startLabel = formatTimeInTimezone(gap.startedAt.toISOString(), timezone);
-  const endLabel = formatTimeInTimezone(gap.endedAt.toISOString(), timezone);
+  const startLabel = formatTimeInTimezone(editedStart.toISOString(), timezone);
+  const endLabel = formatTimeInTimezone(editedEnd.toISOString(), timezone);
+  const isValid = editedStart < editedEnd;
+
+  // Picker config based on active picker
+  const pickerValue = activePicker === "start" ? editedStart : editedEnd;
+  const pickerOnChange =
+    activePicker === "start" ? handleStartChange : handleEndChange;
+  // Constrain pickers within the original gap bounds and each other
+  const pickerMin =
+    activePicker === "start" ? gap.startedAt : editedStart;
+  const pickerMax =
+    activePicker === "start" ? editedEnd : gap.endedAt;
 
   return (
     <Modal
@@ -107,18 +155,94 @@ export function GapFillModal({
             </Pressable>
           </View>
 
-          {/* Gap time info */}
-          <View style={styles.timeCard}>
-            <View style={styles.timeRow}>
-              <Feather name="clock" size={14} color={COLORS.onSurfaceVariant} />
-              <Text style={styles.timeText}>
-                {startLabel} – {endLabel}
+          {/* Time rows */}
+          <View style={styles.timeSection}>
+            {/* Start time row */}
+            <Pressable
+              style={[
+                styles.timePickerRow,
+                activePicker === "start" && styles.timePickerRowActive,
+              ]}
+              onPress={() => handleTogglePicker("start")}
+            >
+              <Text style={styles.timeLabel}>Start</Text>
+              <Text
+                style={[
+                  styles.timeValue,
+                  activePicker === "start" && styles.timeValueActive,
+                ]}
+              >
+                {startLabel}
               </Text>
+              <Feather
+                name={activePicker === "start" ? "chevron-up" : "chevron-down"}
+                size={16}
+                color={
+                  activePicker === "start"
+                    ? COLORS.primary
+                    : COLORS.onSurfaceVariant
+                }
+              />
+            </Pressable>
+
+            {/* End time row */}
+            <Pressable
+              style={[
+                styles.timePickerRow,
+                activePicker === "end" && styles.timePickerRowActive,
+              ]}
+              onPress={() => handleTogglePicker("end")}
+            >
+              <Text style={styles.timeLabel}>End</Text>
+              <Text
+                style={[
+                  styles.timeValue,
+                  activePicker === "end" && styles.timeValueActive,
+                ]}
+              >
+                {endLabel}
+              </Text>
+              <Feather
+                name={activePicker === "end" ? "chevron-up" : "chevron-down"}
+                size={16}
+                color={
+                  activePicker === "end"
+                    ? COLORS.primary
+                    : COLORS.onSurfaceVariant
+                }
+              />
+            </Pressable>
+
+            {/* Duration */}
+            <View style={styles.durationRow}>
+              <Feather name="clock" size={14} color={COLORS.onSurfaceVariant} />
               <Text style={styles.durationText}>
-                {formatDuration(durationSeconds)}
+                {isValid ? formatDuration(durationSeconds) : "—"}
               </Text>
             </View>
           </View>
+
+          {/* Inline picker */}
+          {activePicker !== null && (
+            <View style={styles.pickerContainer}>
+              <DateTimePicker
+                value={pickerValue}
+                mode="time"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={pickerOnChange}
+                minimumDate={pickerMin}
+                maximumDate={pickerMax}
+                themeVariant="light"
+              />
+            </View>
+          )}
+
+          {/* Validation error */}
+          {!isValid && (
+            <Text style={styles.validationError}>
+              Start time must be before end time
+            </Text>
+          )}
 
           {/* Category filter */}
           <ScrollView
@@ -173,7 +297,7 @@ export function GapFillModal({
                   pressed && styles.activityRowPressed,
                 ]}
                 onPress={() => handleSelectActivity(item.id)}
-                disabled={saving}
+                disabled={saving || !isValid}
               >
                 <View
                   style={[
@@ -218,7 +342,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: RADIUS.xxl,
     paddingHorizontal: SPACING["2xl"],
     paddingTop: SPACING.md,
-    maxHeight: "80%",
+    maxHeight: "85%",
   },
   handleBar: {
     width: 40,
@@ -248,25 +372,53 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     backgroundColor: COLORS.surfaceContainerLow,
   },
-  timeCard: {
-    backgroundColor: COLORS.surfaceContainerLow,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.lg,
+  timeSection: {
     marginBottom: SPACING.lg,
-  },
-  timeRow: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: SPACING.sm,
   },
-  timeText: {
-    ...TYPOGRAPHY.body,
+  timePickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+  },
+  timePickerRowActive: {
+    backgroundColor: COLORS.surfaceContainerHigh,
+  },
+  timeLabel: {
+    ...TYPOGRAPHY.labelUppercase,
     color: COLORS.onSurfaceVariant,
     flex: 1,
   },
-  durationText: {
+  timeValue: {
     ...TYPOGRAPHY.titleMd,
     color: COLORS.onSurface,
+    marginRight: SPACING.sm,
+  },
+  timeValueActive: {
+    color: COLORS.primary,
+  },
+  durationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingTop: SPACING.xs,
+  },
+  durationText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.onSurfaceVariant,
+  },
+  pickerContainer: {
+    marginBottom: SPACING.lg,
+  },
+  validationError: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.error,
+    textAlign: "center",
+    marginBottom: SPACING.lg,
   },
   categoryRow: {
     gap: SPACING.sm,
