@@ -1,20 +1,27 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { CategoryBreakdown } from '@/components/insights/category-breakdown';
-import { PeriodToggle } from '@/components/insights/period-toggle';
-import { useInsightsData, type InsightsPeriod } from '@/hooks/useInsightsData';
-import { useUIStore } from '@/store/uiStore';
-import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { ActualVsIdeal } from "@/components/insights/actual-vs-ideal";
+import { CategoryBreakdown } from "@/components/insights/category-breakdown";
+import { PeriodToggle } from "@/components/insights/period-toggle";
+import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import { useInsightsData, type InsightsPeriod } from "@/hooks/useInsightsData";
+import { useUIStore } from "@/store/uiStore";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function InsightsScreen(): React.ReactElement {
   const selectedDate = useUIStore((s) => s.selectedDate);
-  const [period, setPeriod] = useState<InsightsPeriod>('daily');
+  const [period, setPeriod] = useState<InsightsPeriod>("daily");
   const { categoryInsights, coverage, totalTrackedMinutes, isLoading } =
     useInsightsData(selectedDate, period);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Insights</Text>
@@ -42,12 +49,7 @@ export default function InsightsScreen(): React.ReactElement {
             totalTrackedMinutes={totalTrackedMinutes}
           />
 
-          <View style={styles.placeholderCard}>
-            <Text style={styles.placeholderLabel}>ACTUAL VS IDEAL</Text>
-            <Text style={styles.placeholderValue}>
-              {categoryInsights.filter((c) => c.targetMinutes != null).length} categories with goals
-            </Text>
-          </View>
+          <ActualVsIdeal categoryInsights={categoryInsights} />
 
           <View style={styles.placeholderCard}>
             <Text style={styles.placeholderLabel}>TRACKING COVERAGE</Text>
@@ -76,22 +78,22 @@ const styles = StyleSheet.create({
     color: COLORS.onSurface,
   },
   loader: {
-    marginTop: SPACING['3xl'],
+    marginTop: SPACING["3xl"],
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: SPACING.xl,
-    paddingBottom: SPACING['5xl'],
+    paddingBottom: SPACING["5xl"],
     gap: SPACING.lg,
   },
   // Empty state
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: SPACING['3xl'],
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: SPACING["3xl"],
   },
   emptyTitle: {
     ...TYPOGRAPHY.heading,
@@ -101,13 +103,13 @@ const styles = StyleSheet.create({
   emptyBody: {
     ...TYPOGRAPHY.body,
     color: COLORS.onSurfaceVariant,
-    textAlign: 'center',
+    textAlign: "center",
   },
   // Temporary placeholder cards (replaced in Steps 3-5)
   placeholderCard: {
     backgroundColor: COLORS.surfaceContainerLow,
     borderRadius: 16,
-    padding: SPACING['2xl'],
+    padding: SPACING["2xl"],
   },
   placeholderLabel: {
     ...TYPOGRAPHY.labelUppercase,
