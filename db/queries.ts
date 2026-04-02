@@ -377,6 +377,68 @@ export const TIMELINE_ENTRIES_QUERY = `
 `;
 
 // ──────────────────────────────────────────────
+// Insights Queries
+// ──────────────────────────────────────────────
+
+/**
+ * Row shape returned by the insights aggregation query.
+ */
+export interface InsightsCategoryRow {
+  category_id: string;
+  category_name: string;
+  category_color: string;
+  category_icon: string | null;
+  total_seconds: number;
+}
+
+/**
+ * SQL query to aggregate tracked time per category for a date range.
+ * Handles running entries (ended_at IS NULL) by computing duration from started_at to now.
+ * Params: [endOfRangeUTC, startOfRangeUTC]
+ */
+export const INSIGHTS_CATEGORY_QUERY = `
+  SELECT
+    c.id              AS category_id,
+    c.name            AS category_name,
+    c.color           AS category_color,
+    c.icon            AS category_icon,
+    COALESCE(SUM(
+      CASE
+        WHEN te.ended_at IS NOT NULL THEN te.duration_seconds
+        ELSE CAST((julianday('now') - julianday(te.started_at)) * 86400 AS INTEGER)
+      END
+    ), 0) AS total_seconds
+  FROM categories c
+  LEFT JOIN activities a ON a.category_id = c.id AND a.deleted_at IS NULL
+  LEFT JOIN time_entries te ON te.activity_id = a.id
+    AND te.deleted_at IS NULL
+    AND te.started_at <= ?
+    AND (te.ended_at IS NULL OR te.ended_at >= ?)
+  WHERE c.is_archived = 0 AND c.deleted_at IS NULL
+  GROUP BY c.id
+  HAVING total_seconds > 0
+  ORDER BY total_seconds DESC
+`;
+
+/**
+ * Row shape returned by the ideal allocations query.
+ */
+export interface IdealAllocationRow {
+  id: string;
+  category_id: string;
+  target_minutes_per_day: number;
+}
+
+/**
+ * SQL query for reactive ideal allocations (for useQuery).
+ */
+export const IDEAL_ALLOCATIONS_QUERY = `
+  SELECT id, category_id, target_minutes_per_day
+  FROM ideal_allocations
+  WHERE deleted_at IS NULL
+`;
+
+// ──────────────────────────────────────────────
 // Ideal Allocations
 // ──────────────────────────────────────────────
 

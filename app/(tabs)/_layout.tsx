@@ -35,6 +35,15 @@ export default function TabLayout(): React.ReactElement {
           ),
         }}
       />
+      <Tabs.Screen
+        name="insights"
+        options={{
+          title: 'Insights',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="bar-chart-2" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
