@@ -438,6 +438,42 @@ export const IDEAL_ALLOCATIONS_QUERY = `
   WHERE deleted_at IS NULL
 `;
 
+/**
+ * Row shape returned by the activity breakdown query.
+ */
+export interface InsightsActivityRow {
+  activity_id: string;
+  activity_name: string;
+  total_seconds: number;
+}
+
+/**
+ * SQL query to aggregate tracked time per activity within a specific category.
+ * Params: [categoryId, endOfRangeUTC, startOfRangeUTC]
+ */
+export const INSIGHTS_ACTIVITY_QUERY = `
+  SELECT
+    a.id              AS activity_id,
+    a.name            AS activity_name,
+    COALESCE(SUM(
+      CASE
+        WHEN te.ended_at IS NOT NULL THEN te.duration_seconds
+        ELSE CAST((julianday('now') - julianday(te.started_at)) * 86400 AS INTEGER)
+      END
+    ), 0) AS total_seconds
+  FROM activities a
+  LEFT JOIN time_entries te ON te.activity_id = a.id
+    AND te.deleted_at IS NULL
+    AND te.started_at <= ?
+    AND (te.ended_at IS NULL OR te.ended_at >= ?)
+  WHERE a.category_id = ?
+    AND a.is_archived = 0
+    AND a.deleted_at IS NULL
+  GROUP BY a.id
+  HAVING total_seconds > 0
+  ORDER BY total_seconds DESC
+`;
+
 // ──────────────────────────────────────────────
 // Ideal Allocations
 // ──────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityBreakdown } from '@/components/insights/activity-breakdown';
 import { ActualVsIdeal } from '@/components/insights/actual-vs-ideal';
 import { CategoryBreakdown } from '@/components/insights/category-breakdown';
 import { PeriodToggle } from '@/components/insights/period-toggle';
@@ -45,6 +46,12 @@ export default function InsightsScreen(): React.ReactElement {
           />
 
           <ActualVsIdeal categoryInsights={categoryInsights} />
+
+          <ActivityBreakdown
+            categoryInsights={categoryInsights}
+            selectedDate={selectedDate}
+            period={period}
+          />
 
           <TrackingCoverage coverage={coverage} period={period} />
         </ScrollView>

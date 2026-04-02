@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.habits.app"
+      "bundleIdentifier": "com.myozawwin.habitsapp"
     },
     "android": {
       "adaptiveIcon": {
