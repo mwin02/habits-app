@@ -1,18 +1,13 @@
-import { ActualVsIdeal } from "@/components/insights/actual-vs-ideal";
-import { CategoryBreakdown } from "@/components/insights/category-breakdown";
-import { PeriodToggle } from "@/components/insights/period-toggle";
-import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
-import { useInsightsData, type InsightsPeriod } from "@/hooks/useInsightsData";
-import { useUIStore } from "@/store/uiStore";
-import React, { useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import React, { useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActualVsIdeal } from '@/components/insights/actual-vs-ideal';
+import { CategoryBreakdown } from '@/components/insights/category-breakdown';
+import { PeriodToggle } from '@/components/insights/period-toggle';
+import { TrackingCoverage } from '@/components/insights/tracking-coverage';
+import { COLORS, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { useInsightsData, type InsightsPeriod } from '@/hooks/useInsightsData';
+import { useUIStore } from '@/store/uiStore';
 
 export default function InsightsScreen(): React.ReactElement {
   const selectedDate = useUIStore((s) => s.selectedDate);
@@ -51,12 +46,7 @@ export default function InsightsScreen(): React.ReactElement {
 
           <ActualVsIdeal categoryInsights={categoryInsights} />
 
-          <View style={styles.placeholderCard}>
-            <Text style={styles.placeholderLabel}>TRACKING COVERAGE</Text>
-            <Text style={styles.placeholderValue}>
-              {coverage.coveragePercent}% of waking hours
-            </Text>
-          </View>
+          <TrackingCoverage coverage={coverage} period={period} />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -104,20 +94,5 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.body,
     color: COLORS.onSurfaceVariant,
     textAlign: "center",
-  },
-  // Temporary placeholder cards (replaced in Steps 3-5)
-  placeholderCard: {
-    backgroundColor: COLORS.surfaceContainerLow,
-    borderRadius: 16,
-    padding: SPACING["2xl"],
-  },
-  placeholderLabel: {
-    ...TYPOGRAPHY.labelUppercase,
-    color: COLORS.onSurfaceVariant,
-    marginBottom: SPACING.sm,
-  },
-  placeholderValue: {
-    ...TYPOGRAPHY.titleMd,
-    color: COLORS.onSurface,
   },
 });
