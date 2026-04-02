@@ -41,6 +41,7 @@ Full implementation plan: `/Users/myozawwin/.claude/plans/ethereal-percolating-c
 - **Fonts:** Manrope (headlines/display) + Plus Jakarta Sans (labels/body) via `@expo-google-fonts`
 - **Icons:** Feather icons from `@expo/vector-icons` (thin-stroke style)
 - **Gradients/Blur:** `expo-linear-gradient`, `expo-blur`
+- **SVG:** `react-native-svg` (used for donut charts in Insights tab)
 
 ## Project Structure
 
@@ -67,7 +68,9 @@ habits-app/
 │   ├── useTimer.ts         # Core timer hook (start/stop/switch via PowerSync useQuery)
 │   ├── useElapsedTime.ts   # Live-ticking elapsed seconds (recalculates from startedAt)
 │   ├── useForgottenTimer.ts # Detects stale timers on app foreground (>2h or different day)
-│   └── useCategoriesWithActivities.ts # Reactive grouped categories + activities
+│   ├── useCategoriesWithActivities.ts # Reactive grouped categories + activities
+│   ├── useInsightsData.ts  # Aggregated insights (category breakdown, coverage, actual vs ideal)
+│   └── useActivityBreakdown.ts # Activity-level drill-down within a category
 ├── lib/                    # Library initializations
 │   ├── powersync.ts        # PowerSync DB instance (OPSqliteOpenFactory, local-only mode)
 │   ├── timezone.ts         # IANA timezone helpers (format, isToday, duration display)
@@ -132,14 +135,6 @@ npx expo start --clear
 
 ## Common Patterns
 
-### Starting/stopping timer
-
-```typescript
-// Always use the useTimer hook — never manipulate time_entries directly from screens
-const { startActivity, stopActivity, switchActivity, runningEntry } =
-  useTimer();
-```
-
 ### Quick-switch
 
 One tap stops current activity and starts new one. No confirmation modal. Show toast.
@@ -155,16 +150,7 @@ On app foreground, check for `time_entries` where `ended_at IS NULL`. If found a
 - **`CategoryChip`** — Colored pill showing category name with dot indicator. Does NOT accept a `selected` prop — wrap in a styled `Pressable` with a border for selection state.
 - **`CategoryIcon`** — Maps preset icon strings (e.g., `'briefcase'`, `'heart'`) to Feather icons with fallbacks
 - **`PulsingDots`** — Animated dots indicator for active timer state
-
-### Reactive queries
-
-```typescript
-import { useQuery } from "@powersync/react";
-// Auto-updates when the categories table changes
-const { data: categories, isLoading } = useQuery(
-  "SELECT * FROM categories WHERE ...",
-);
-```
+- **`DonutChart`** (`components/insights/donut-chart.tsx`) — Reusable SVG donut chart. Props: `slices` (value + color), `size`, `strokeWidth`, `centerLabel`, `centerSubLabel`. Handles single-slice and empty states.
 
 ### Reusable Hooks
 
@@ -173,6 +159,8 @@ const { data: categories, isLoading } = useQuery(
 - **`useTimer()`** — Core timer hook (start/stop/switch)
 - **`useElapsedTime(startedAt)`** — Live-ticking seconds from a start time
 - **`useForgottenTimer()`** — Detects stale timers on app foreground
+- **`useInsightsData(selectedDate, period)`** — Returns `categoryInsights[]`, `coverage`, `totalTrackedMinutes` for daily/weekly periods. Joins category aggregations with ideal allocations.
+- **`useActivityBreakdown(categoryId, categoryColor, selectedDate, period)`** — Returns activity-level time slices within a category, with tonal color variations derived from the parent category color.
 
 ### Available Query Functions (`db/queries.ts`)
 
@@ -185,24 +173,7 @@ const { data: categories, isLoading } = useQuery(
 
 **Critical:** All times are stored in UTC. Each `time_entry` stores an IANA timezone. Always display in the entry's original timezone.
 
-**Gotcha — Never add local minutes to UTC dates directly:**
-
-```typescript
-// ❌ WRONG — gives incorrect results when timezone offset ≠ 0
-const date = new Date(dayStartUTC.getTime() + localMinutes * 60_000);
-
-// ✅ CORRECT — compute the offset first
-function localMinutesToDate(
-  localMinutes: number,
-  dayStartUTC: Date,
-  timezone: string,
-): Date {
-  const utcMidnightAsLocalMinutes = minutesSinceMidnight(dayStartUTC, timezone);
-  return new Date(
-    dayStartUTC.getTime() + (localMinutes - utcMidnightAsLocalMinutes) * 60_000,
-  );
-}
-```
+**Gotcha:** Never add local minutes to UTC dates directly — use `localMinutesToDate()` from `useTimelineData.ts` which accounts for timezone offset.
 
 **Key timezone helpers in `lib/timezone.ts`:**
 
@@ -225,9 +196,11 @@ function localMinutesToDate(
 - **Phase 1, Step 4:** Forgotten stop modal (bottom sheet with time picker)
 - **Phase 2, Step 5:** Timeline tab — vertical day timeline with time axis, entry blocks, gap blocks, clustering of short entries, overlap detection (side-by-side layout), current time indicator, date navigation (DateHeader + WeekStrip), EntryDetailModal (time editing + delete), GapFillModal (activity picker with adjustable times)
 
+- **Phase 2, Step 6:** Insights tab — Daily/Weekly toggle, category breakdown bars, actual vs ideal comparison, activity breakdown with SVG donut chart and category selector, tracking coverage card
+
 ### Next Up
 
-- **Phase 2, Step 6:** Insights tab — daily/weekly/monthly charts, actual vs ideal comparison
+- **Phase 3:** Cloud sync (Supabase Auth, PowerSync sync, Row-Level Security)
 
 ## Important Constraints
 
