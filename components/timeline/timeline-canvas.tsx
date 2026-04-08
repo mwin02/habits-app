@@ -69,18 +69,22 @@ export function TimelineCanvas({
   // Only one cluster can be expanded at a time
   const [expandedClusterIndex, setExpandedClusterIndex] = useState<number | null>(null);
 
-  // Current time position (re-renders every 30s for today)
-  const [nowMinutes, setNowMinutes] = useState(() =>
-    minutesSinceMidnight(new Date(), timezone),
-  );
+  // Live-ticking "now" — single source of truth for both the current-time
+  // indicator and the running entry's end position. Ticks every 1s on today.
+  const [liveNow, setLiveNow] = useState(() => new Date());
 
   useEffect(() => {
     if (!isToday) return;
     const interval = setInterval(() => {
-      setNowMinutes(minutesSinceMidnight(new Date(), timezone));
-    }, 30_000);
+      setLiveNow(new Date());
+    }, 1_000);
     return () => clearInterval(interval);
-  }, [isToday, timezone]);
+  }, [isToday]);
+
+  const nowMinutes = useMemo(
+    () => minutesSinceMidnight(liveNow, timezone),
+    [liveNow, timezone],
+  );
 
   const canvasHeight =
     (rangeEndMinutes - rangeStartMinutes) * PIXELS_PER_MINUTE;
@@ -109,11 +113,14 @@ export function TimelineCanvas({
   );
 
   const getHeight = useCallback(
-    (startDate: Date, endDate: Date): number => {
+    (startDate: Date, endDate: Date, isRunning = false): number => {
       const startMins = minutesSinceMidnight(startDate, timezone);
       const endMins = minutesSinceMidnight(endDate, timezone);
-      const durationMins = endMins - startMins;
-      return Math.max(MIN_BLOCK_HEIGHT, durationMins * PIXELS_PER_MINUTE);
+      const durationMins = Math.max(0, endMins - startMins);
+      const raw = durationMins * PIXELS_PER_MINUTE;
+      // Running entries skip the min-height clamp so their bottom edge stays
+      // exactly at the "now" indicator line instead of overshooting it.
+      return isRunning ? raw : Math.max(MIN_BLOCK_HEIGHT, raw);
     },
     [timezone],
   );
@@ -125,10 +132,14 @@ export function TimelineCanvas({
     for (const item of items) {
       let startDate: Date;
       let endDate: Date;
+      let isRunning = false;
 
       if (item.type === "entry") {
         startDate = item.data.startedAt;
-        endDate = item.data.endedAt ?? new Date();
+        isRunning = item.data.isRunning;
+        // For running entries, use the live-ticking `liveNow` so the block's
+        // bottom edge stays glued to the current-time indicator.
+        endDate = isRunning ? liveNow : (item.data.endedAt as Date);
       } else if (item.type === "cluster") {
         startDate = item.data.startedAt;
         endDate = item.data.endedAt;
@@ -138,7 +149,7 @@ export function TimelineCanvas({
       }
 
       const top = getTop(startDate);
-      const height = getHeight(startDate, endDate);
+      const height = getHeight(startDate, endDate, isRunning);
       natural.push({ top, height, bottom: top + height });
     }
 
@@ -250,7 +261,7 @@ export function TimelineCanvas({
     }
 
     return positions;
-  }, [items, getTop, getHeight]);
+  }, [items, getTop, getHeight, liveNow]);
 
   // Canvas height: max of time-based height and last block bottom
   const lastBottom =
@@ -312,7 +323,7 @@ export function TimelineCanvas({
                 categoryIcon={e.categoryIcon}
                 durationSeconds={e.durationSeconds}
                 note={e.note}
-                isRunning={e.endedAt === null}
+                isRunning={e.isRunning}
                 height={height}
                 onPress={() => onEntryPress(e.id)}
               />
