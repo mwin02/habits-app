@@ -45,7 +45,7 @@ export interface UseTimelineDataResult {
 // ──────────────────────────────────────────────
 
 /** Minimum gap duration (in seconds) to show as an "Untracked" block */
-const MIN_GAP_SECONDS = 60;
+const MIN_GAP_SECONDS = 30 * 60; // 30 minutes
 
 /** Entries shorter than this (in seconds) are candidates for clustering */
 const SHORT_ENTRY_THRESHOLD_SECONDS = 15 * 60; // 15 minutes
