@@ -45,7 +45,7 @@ export interface UseTimelineDataResult {
 // ──────────────────────────────────────────────
 
 /** Minimum gap duration (in seconds) to show as an "Untracked" block */
-const MIN_GAP_SECONDS = 60;
+const MIN_GAP_SECONDS = 30 * 60; // 30 minutes
 
 /** Entries shorter than this (in seconds) are candidates for clustering */
 const SHORT_ENTRY_THRESHOLD_SECONDS = 15 * 60; // 15 minutes
@@ -155,6 +155,13 @@ function clusterShortEntries(items: TimelineItem[]): TimelineItem[] {
 
   for (const item of items) {
     if (item.type === "entry") {
+      // Running entries always render individually so they can live-grow
+      // and stay anchored to the "now" indicator.
+      if (item.data.isRunning) {
+        flushPending();
+        result.push(item);
+        continue;
+      }
       const duration = item.data.durationSeconds ?? 0;
       if (duration < SHORT_ENTRY_THRESHOLD_SECONDS) {
         pendingShort.push(item.data);
@@ -221,15 +228,17 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
       clampedEnd: Date;
     })[] = rows.map((row) => {
       const startedAt = new Date(row.started_at);
-      const endedAt = row.ended_at
-        ? new Date(row.ended_at)
-        : isToday
-          ? now
-          : null;
+      const isRunning = row.ended_at === null && isToday;
+      // Real end time from DB (or null for running entries). We keep this null
+      // on the returned entry so the canvas can drive live positioning from a
+      // single ticking "now". `effectiveEnd` is used only for internal sort,
+      // clamping, gap detection, and duration computation.
+      const realEndedAt = row.ended_at ? new Date(row.ended_at) : null;
+      const effectiveEnd = realEndedAt ?? (isToday ? now : null);
 
       const clampedStart = clampDate(startedAt, dayStart, dayEnd);
-      const clampedEnd = endedAt
-        ? clampDate(endedAt, dayStart, dayEnd)
+      const clampedEnd = effectiveEnd
+        ? clampDate(effectiveEnd, dayStart, dayEnd)
         : effectiveDayEnd;
 
       const durationSeconds = row.ended_at
@@ -244,7 +253,8 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
         categoryColor: row.category_color,
         categoryIcon: row.category_icon,
         startedAt: clampedStart,
-        endedAt: clampedEnd,
+        endedAt: isRunning ? null : clampedEnd,
+        isRunning,
         durationSeconds,
         note: row.note,
         source: row.source as TimeEntrySource,

@@ -6,6 +6,7 @@ import {
 import { getCurrentTimezone, getTodayDate } from "@/lib/timezone";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ACTIVE_CHIP_HEIGHT, ActiveSessionChip } from "./active-session-chip";
 import { ClusterBlock } from "./cluster-block";
 import { CurrentTimeIndicator } from "./current-time-indicator";
 import { GapBlock } from "./gap-block";
@@ -69,18 +70,22 @@ export function TimelineCanvas({
   // Only one cluster can be expanded at a time
   const [expandedClusterIndex, setExpandedClusterIndex] = useState<number | null>(null);
 
-  // Current time position (re-renders every 30s for today)
-  const [nowMinutes, setNowMinutes] = useState(() =>
-    minutesSinceMidnight(new Date(), timezone),
-  );
+  // Live-ticking "now" — single source of truth for both the current-time
+  // indicator and the running entry's end position. Ticks every 1s on today.
+  const [liveNow, setLiveNow] = useState(() => new Date());
 
   useEffect(() => {
     if (!isToday) return;
     const interval = setInterval(() => {
-      setNowMinutes(minutesSinceMidnight(new Date(), timezone));
-    }, 30_000);
+      setLiveNow(new Date());
+    }, 1_000);
     return () => clearInterval(interval);
-  }, [isToday, timezone]);
+  }, [isToday]);
+
+  const nowMinutes = useMemo(
+    () => minutesSinceMidnight(liveNow, timezone),
+    [liveNow, timezone],
+  );
 
   const canvasHeight =
     (rangeEndMinutes - rangeStartMinutes) * PIXELS_PER_MINUTE;
@@ -109,11 +114,14 @@ export function TimelineCanvas({
   );
 
   const getHeight = useCallback(
-    (startDate: Date, endDate: Date): number => {
+    (startDate: Date, endDate: Date, isRunning = false): number => {
       const startMins = minutesSinceMidnight(startDate, timezone);
       const endMins = minutesSinceMidnight(endDate, timezone);
-      const durationMins = endMins - startMins;
-      return Math.max(MIN_BLOCK_HEIGHT, durationMins * PIXELS_PER_MINUTE);
+      const durationMins = Math.max(0, endMins - startMins);
+      const raw = durationMins * PIXELS_PER_MINUTE;
+      // Running entries skip the min-height clamp so their bottom edge stays
+      // exactly at the "now" indicator line instead of overshooting it.
+      return isRunning ? raw : Math.max(MIN_BLOCK_HEIGHT, raw);
     },
     [timezone],
   );
@@ -125,10 +133,14 @@ export function TimelineCanvas({
     for (const item of items) {
       let startDate: Date;
       let endDate: Date;
+      let isRunning = false;
 
       if (item.type === "entry") {
         startDate = item.data.startedAt;
-        endDate = item.data.endedAt ?? new Date();
+        isRunning = item.data.isRunning;
+        // For running entries, use the live-ticking `liveNow` so the block's
+        // bottom edge stays glued to the current-time indicator.
+        endDate = isRunning ? liveNow : (item.data.endedAt as Date);
       } else if (item.type === "cluster") {
         startDate = item.data.startedAt;
         endDate = item.data.endedAt;
@@ -138,7 +150,7 @@ export function TimelineCanvas({
       }
 
       const top = getTop(startDate);
-      const height = getHeight(startDate, endDate);
+      const height = getHeight(startDate, endDate, isRunning);
       natural.push({ top, height, bottom: top + height });
     }
 
@@ -250,7 +262,7 @@ export function TimelineCanvas({
     }
 
     return positions;
-  }, [items, getTop, getHeight]);
+  }, [items, getTop, getHeight, liveNow]);
 
   // Canvas height: max of time-based height and last block bottom
   const lastBottom =
@@ -266,6 +278,18 @@ export function TimelineCanvas({
     : -1;
   const showNowIndicator =
     isToday && nowTop >= 0 && nowTop <= resolvedCanvasHeight;
+
+  // Find the running entry (if any) — surfaced as an ActiveSessionChip pinned
+  // to the now-indicator instead of as a regular timeline block.
+  const runningEntry = useMemo(() => {
+    if (!isToday) return null;
+    for (const item of items) {
+      if (item.type === "entry" && item.data.isRunning) {
+        return item.data;
+      }
+    }
+    return null;
+  }, [items, isToday]);
 
   return (
     <ScrollView
@@ -296,6 +320,9 @@ export function TimelineCanvas({
 
         if (item.type === "entry") {
           const e = item.data;
+          // Running entries are surfaced as an ActiveSessionChip pinned to the
+          // now-indicator below — skip rendering them as a regular block.
+          if (e.isRunning) return null;
           const entryStyle =
             totalColumns > 1
               ? getColumnStyle(totalColumns, columnIndex)
@@ -312,7 +339,7 @@ export function TimelineCanvas({
                 categoryIcon={e.categoryIcon}
                 durationSeconds={e.durationSeconds}
                 note={e.note}
-                isRunning={e.endedAt === null}
+                isRunning={e.isRunning}
                 height={height}
                 onPress={() => onEntryPress(e.id)}
               />
@@ -379,6 +406,33 @@ export function TimelineCanvas({
           <CurrentTimeIndicator timezone={timezone} />
         </View>
       )}
+
+      {/* Active session chip — attached to the now-indicator line. Starts
+          below the line, and flips above once the running session has
+          accumulated enough elapsed pixels to fit without overlap. */}
+      {showNowIndicator && runningEntry && (() => {
+        const elapsedPixels =
+          ((liveNow.getTime() - runningEntry.startedAt.getTime()) / 60_000) *
+          PIXELS_PER_MINUTE;
+        const fitsAbove = elapsedPixels >= ACTIVE_CHIP_HEIGHT;
+        const chipTop = fitsAbove
+          ? nowTop - ACTIVE_CHIP_HEIGHT
+          : nowTop;
+        return (
+          <View style={[styles.activeChipWrapper, { top: chipTop }]}>
+            <ActiveSessionChip
+              activityName={runningEntry.activityName}
+              categoryName={runningEntry.categoryName}
+              categoryColor={runningEntry.categoryColor}
+              categoryIcon={runningEntry.categoryIcon}
+              startedAt={runningEntry.startedAt}
+              liveNow={liveNow}
+              attachment={fitsAbove ? 'bottom' : 'top'}
+              onPress={() => onEntryPress(runningEntry.id)}
+            />
+          </View>
+        );
+      })()}
     </ScrollView>
   );
 }
@@ -413,5 +467,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
+  },
+  activeChipWrapper: {
+    position: "absolute",
+    left: BLOCK_LEFT,
+    right: SPACING.lg,
+    // Render below the now-indicator so the indicator line visually becomes
+    // the chip's attached-edge border where they meet.
+    zIndex: 9,
   },
 });

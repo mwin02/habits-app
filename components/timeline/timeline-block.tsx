@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActiveDot } from '@/components/common/active-dot';
 import { CategoryIcon } from '@/components/common/category-icon';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/constants/theme';
 import { formatDuration } from '@/lib/timezone';
@@ -53,6 +54,7 @@ export function TimelineBlock({
           <Text style={styles.compactDuration}>
             {durationSeconds != null ? formatDuration(durationSeconds) : '—'}
           </Text>
+          {isRunning && <ActiveDot />}
         </View>
       ) : (
         // Full: icon + name on top, duration + note indicator on bottom
@@ -69,10 +71,12 @@ export function TimelineBlock({
             </Text>
           </View>
           <View style={styles.bottomRow}>
-            <Text style={styles.duration}>
-              {durationSeconds != null ? formatDuration(durationSeconds) : '—'}
-              {isRunning ? ' ...' : ''}
-            </Text>
+            <View style={styles.durationRow}>
+              <Text style={styles.duration}>
+                {durationSeconds != null ? formatDuration(durationSeconds) : '—'}
+              </Text>
+              {isRunning && <ActiveDot />}
+            </View>
             {note ? (
               <Feather name="file-text" size={12} color={COLORS.onSurfaceVariant} />
             ) : null}
@@ -141,6 +145,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  durationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
   },
   duration: {
     ...TYPOGRAPHY.bodySmall,

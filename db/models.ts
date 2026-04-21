@@ -56,6 +56,7 @@ export interface TimelineEntry {
   categoryColor: string;
   startedAt: Date;
   endedAt: Date | null;
+  isRunning: boolean;
   durationSeconds: number | null;
   note: string | null;
   source: TimeEntrySource;
