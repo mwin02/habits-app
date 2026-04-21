@@ -4,7 +4,7 @@ import {
   INSIGHTS_ACTIVITY_QUERY,
   type InsightsActivityRow,
 } from '@/db/queries';
-import { getCurrentTimezone } from '@/lib/timezone';
+import { getCurrentTimezone, getEndOfDay, getStartOfDay } from '@/lib/timezone';
 import type { InsightsPeriod } from './useInsightsData';
 
 // ──────────────────────────────────────────────
@@ -97,21 +97,23 @@ export function useActivityBreakdown(
   const { startOfRangeUTC, endOfRangeUTC } = useMemo(() => {
     if (period === 'daily') {
       return {
-        startOfRangeUTC: `${selectedDate}T00:00:00.000Z`,
-        endOfRangeUTC: `${selectedDate}T23:59:59.999Z`,
+        startOfRangeUTC: getStartOfDay(selectedDate, timezone).toISOString(),
+        endOfRangeUTC: getEndOfDay(selectedDate, timezone).toISOString(),
       };
     }
     const { weekStart, weekEnd } = getWeekRange(selectedDate);
     return {
-      startOfRangeUTC: `${weekStart}T00:00:00.000Z`,
-      endOfRangeUTC: `${weekEnd}T23:59:59.999Z`,
+      startOfRangeUTC: getStartOfDay(weekStart, timezone).toISOString(),
+      endOfRangeUTC: getEndOfDay(weekEnd, timezone).toISOString(),
     };
   }, [selectedDate, period, timezone]);
 
   // Only run the query if a category is selected
   const { data: activityRows, isLoading } = useQuery<InsightsActivityRow>(
     categoryId ? INSIGHTS_ACTIVITY_QUERY : 'SELECT 1 WHERE 0',
-    categoryId ? [endOfRangeUTC, startOfRangeUTC, categoryId] : [],
+    categoryId
+      ? [endOfRangeUTC, startOfRangeUTC, endOfRangeUTC, startOfRangeUTC, categoryId]
+      : [],
   );
 
   const result = useMemo(() => {

@@ -7,7 +7,7 @@ import {
   type IdealAllocationRow,
 } from '@/db/queries';
 import type { CategoryInsight, DayCoverage } from '@/db/models';
-import { getCurrentTimezone } from '@/lib/timezone';
+import { getCurrentTimezone, getEndOfDay, getStartOfDay } from '@/lib/timezone';
 
 // ──────────────────────────────────────────────
 // Types
@@ -78,15 +78,16 @@ export function useInsightsData(
 ): UseInsightsDataResult {
   const timezone = getCurrentTimezone();
 
-  // Compute UTC date range boundaries
+  // Use timezone-aware local-midnight boundaries so the range matches the
+  // user's local day rather than naive UTC midnight.
   const { startOfRangeUTC, endOfRangeUTC, numDays } = useMemo(() => {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone })
       .format(new Date()); // YYYY-MM-DD
 
     if (period === 'daily') {
       return {
-        startOfRangeUTC: `${selectedDate}T00:00:00.000Z`,
-        endOfRangeUTC: `${selectedDate}T23:59:59.999Z`,
+        startOfRangeUTC: getStartOfDay(selectedDate, timezone).toISOString(),
+        endOfRangeUTC: getEndOfDay(selectedDate, timezone).toISOString(),
         numDays: 1,
       };
     }
@@ -94,8 +95,8 @@ export function useInsightsData(
     // Weekly: Mon–Sun
     const { weekStart, weekEnd } = getWeekRange(selectedDate);
     return {
-      startOfRangeUTC: `${weekStart}T00:00:00.000Z`,
-      endOfRangeUTC: `${weekEnd}T23:59:59.999Z`,
+      startOfRangeUTC: getStartOfDay(weekStart, timezone).toISOString(),
+      endOfRangeUTC: getEndOfDay(weekEnd, timezone).toISOString(),
       numDays: countDaysInRange(weekStart, weekEnd, today),
     };
   }, [selectedDate, period, timezone]);
@@ -103,6 +104,8 @@ export function useInsightsData(
   // Reactive query: time per category
   const { data: categoryRows, isLoading: categoriesLoading } =
     useQuery<InsightsCategoryRow>(INSIGHTS_CATEGORY_QUERY, [
+      endOfRangeUTC,
+      startOfRangeUTC,
       endOfRangeUTC,
       startOfRangeUTC,
     ]);

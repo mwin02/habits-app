@@ -393,8 +393,10 @@ export interface InsightsCategoryRow {
 
 /**
  * SQL query to aggregate tracked time per category for a date range.
- * Handles running entries (ended_at IS NULL) by computing duration from started_at to now.
- * Params: [endOfRangeUTC, startOfRangeUTC]
+ * Clips each entry to the queried range so midnight-spanning entries are
+ * split proportionally between days. Running entries (ended_at IS NULL)
+ * use the current time as their effective end.
+ * Params: [endOfRangeUTC, startOfRangeUTC, endOfRangeUTC, startOfRangeUTC]
  */
 export const INSIGHTS_CATEGORY_QUERY = `
   SELECT
@@ -403,10 +405,10 @@ export const INSIGHTS_CATEGORY_QUERY = `
     c.color           AS category_color,
     c.icon            AS category_icon,
     COALESCE(SUM(
-      CASE
-        WHEN te.ended_at IS NOT NULL THEN te.duration_seconds
-        ELSE CAST((julianday('now') - julianday(te.started_at)) * 86400 AS INTEGER)
-      END
+      MAX(0, CAST(
+        (MIN(julianday(?), julianday(COALESCE(te.ended_at, 'now')))
+         - MAX(julianday(?), julianday(te.started_at))) * 86400 AS INTEGER
+      ))
     ), 0) AS total_seconds
   FROM categories c
   LEFT JOIN activities a ON a.category_id = c.id AND a.deleted_at IS NULL
@@ -449,17 +451,19 @@ export interface InsightsActivityRow {
 
 /**
  * SQL query to aggregate tracked time per activity within a specific category.
- * Params: [categoryId, endOfRangeUTC, startOfRangeUTC]
+ * Clips each entry to the queried range so midnight-spanning entries are
+ * split proportionally between days.
+ * Params: [endOfRangeUTC, startOfRangeUTC, endOfRangeUTC, startOfRangeUTC, categoryId]
  */
 export const INSIGHTS_ACTIVITY_QUERY = `
   SELECT
     a.id              AS activity_id,
     a.name            AS activity_name,
     COALESCE(SUM(
-      CASE
-        WHEN te.ended_at IS NOT NULL THEN te.duration_seconds
-        ELSE CAST((julianday('now') - julianday(te.started_at)) * 86400 AS INTEGER)
-      END
+      MAX(0, CAST(
+        (MIN(julianday(?), julianday(COALESCE(te.ended_at, 'now')))
+         - MAX(julianday(?), julianday(te.started_at))) * 86400 AS INTEGER
+      ))
     ), 0) AS total_seconds
   FROM activities a
   LEFT JOIN time_entries te ON te.activity_id = a.id
