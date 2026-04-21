@@ -179,11 +179,15 @@ On app foreground, check for `time_entries` where `ended_at IS NULL`. If found a
 
 - `getCurrentTimezone()` — Returns current IANA timezone string
 - `getTodayDate(timezone)` — Returns `YYYY-MM-DD` for today in the given timezone
+- `getStartOfDay(dateStr, timezone)` — UTC `Date` for local midnight of `dateStr`
+- `getEndOfDay(dateStr, timezone)` — UTC `Date` for the last instant of that local day (DST-safe)
 - `formatTimeInTimezone(isoString, timezone)` — Formats time for display (e.g., "9:30 AM")
 - `formatDuration(seconds)` — Human-readable duration (e.g., "1h 30m")
 - `minutesSinceMidnight(date, timezone)` — Minutes since midnight for a Date in a timezone (in `useTimelineData.ts`)
 
-**Day boundary queries:** Use naive UTC boundaries (`${date}T00:00:00.000Z` / `T23:59:59.999Z`) as query params with overlap logic (`started_at <= dayEnd AND (ended_at IS NULL OR ended_at >= dayStart)`). This captures entries near midnight even with timezone offsets.
+**Day boundary queries:** Always use `getStartOfDay(date, tz)` / `getEndOfDay(date, tz)` as query params — never naive `${date}T00:00:00.000Z` strings, which represent UTC midnight and are off by the user's UTC offset in local time (causes entries to be clipped to e.g. 7 AM local in UTC+7). Combine with overlap logic (`started_at <= dayEnd AND (ended_at IS NULL OR ended_at >= dayStart)`).
+
+**Range aggregations must clip entry durations:** When summing time across a date range (e.g. `INSIGHTS_CATEGORY_QUERY`), sum the clipped intersection `MIN(rangeEnd, ended_at_or_now) - MAX(rangeStart, started_at)`, not the full `duration_seconds`. Otherwise a midnight-spanning entry gets its full duration counted in both days' totals.
 
 ## Implementation Progress
 
