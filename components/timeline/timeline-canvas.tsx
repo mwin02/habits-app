@@ -427,6 +427,7 @@ export function TimelineCanvas({
               categoryIcon={runningEntry.categoryIcon}
               startedAt={runningEntry.startedAt}
               liveNow={liveNow}
+              attachment={fitsAbove ? 'bottom' : 'top'}
               onPress={() => onEntryPress(runningEntry.id)}
             />
           </View>
@@ -471,6 +472,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: BLOCK_LEFT,
     right: SPACING.lg,
-    zIndex: 11,
+    // Render below the now-indicator so the indicator line visually becomes
+    // the chip's attached-edge border where they meet.
+    zIndex: 9,
   },
 });
