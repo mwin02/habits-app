@@ -4,8 +4,8 @@ import { deleteEntry, updateEntryTimes } from "@/db/queries";
 import type { TimelineEntryData } from "@/hooks/useTimelineData";
 import { formatDuration, formatTimeInTimezone } from "@/lib/timezone";
 import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -60,19 +60,13 @@ export function EntryDetailModal({
     [],
   );
 
-  const handleEndChange = useCallback(
-    (_event: unknown, date?: Date): void => {
-      if (date) setEditedEnd(date);
-    },
-    [],
-  );
+  const handleEndChange = useCallback((_event: unknown, date?: Date): void => {
+    if (date) setEditedEnd(date);
+  }, []);
 
-  const handleTogglePicker = useCallback(
-    (picker: "start" | "end"): void => {
-      setActivePicker((prev) => (prev === picker ? null : picker));
-    },
-    [],
-  );
+  const handleTogglePicker = useCallback((picker: "start" | "end"): void => {
+    setActivePicker((prev) => (prev === picker ? null : picker));
+  }, []);
 
   const handleSaveTimes = useCallback(async (): Promise<void> => {
     if (!entry || !timesDirty || !isValid || editedEnd === null) return;
@@ -142,17 +136,10 @@ export function EntryDetailModal({
     activePicker === "start" ? handleStartChange : handleEndChange;
   const pickerMin = activePicker === "end" ? editedStart : undefined;
   const pickerMax =
-    activePicker === "start"
-      ? editedEnd ?? new Date()
-      : new Date();
+    activePicker === "start" ? (editedEnd ?? new Date()) : new Date();
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
 
@@ -165,11 +152,7 @@ export function EntryDetailModal({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Entry Details</Text>
-            <Pressable
-              style={styles.closeButton}
-              onPress={onClose}
-              hitSlop={8}
-            >
+            <Pressable style={styles.closeButton} onPress={onClose} hitSlop={8}>
               <Feather name="x" size={20} color={COLORS.onSurfaceVariant} />
             </Pressable>
           </View>
@@ -202,6 +185,7 @@ export function EntryDetailModal({
                 activePicker === "start" && styles.timeRowActive,
               ]}
               onPress={() => handleTogglePicker("start")}
+              disabled={entry.endedAt === null} // Disable if entry is running since start time to not allow editing of active entry
             >
               <Text style={styles.timeLabel}>Start</Text>
               <Text
@@ -212,15 +196,19 @@ export function EntryDetailModal({
               >
                 {startTimeLabel}
               </Text>
-              <Feather
-                name={activePicker === "start" ? "chevron-up" : "chevron-down"}
-                size={16}
-                color={
-                  activePicker === "start"
-                    ? COLORS.primary
-                    : COLORS.onSurfaceVariant
-                }
-              />
+              {entry.endedAt !== null && (
+                <Feather
+                  name={
+                    activePicker === "start" ? "chevron-up" : "chevron-down"
+                  }
+                  size={16}
+                  color={
+                    activePicker === "start"
+                      ? COLORS.primary
+                      : COLORS.onSurfaceVariant
+                  }
+                />
+              )}
             </Pressable>
 
             {/* End time row */}
