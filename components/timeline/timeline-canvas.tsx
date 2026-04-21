@@ -68,12 +68,17 @@ export function TimelineCanvas({
   const isToday = selectedDate === getTodayDate(getCurrentTimezone());
 
   // Only one cluster can be expanded at a time
-  const [expandedClusterIndex, setExpandedClusterIndex] = useState<number | null>(null);
+  const [expandedClusterIndex, setExpandedClusterIndex] = useState<
+    number | null
+  >(null);
 
   // Live-ticking "now" — single source of truth for both the current-time
   // indicator and the running entry's end position. Ticks every 1s on today.
   const [liveNow, setLiveNow] = useState(() => new Date());
-
+  const filteredItems = useMemo(
+    () => items.filter((item) => item.data.endedAt !== null),
+    [items],
+  );
   useEffect(() => {
     if (!isToday) return;
     const interval = setInterval(() => {
@@ -130,7 +135,7 @@ export function TimelineCanvas({
   const resolvedPositions = useMemo(() => {
     // Step 1: Compute natural positions for all items
     const natural: { top: number; height: number; bottom: number }[] = [];
-    for (const item of items) {
+    for (const item of filteredItems) {
       let startDate: Date;
       let endDate: Date;
       let isRunning = false;
@@ -153,23 +158,28 @@ export function TimelineCanvas({
       const height = getHeight(startDate, endDate, isRunning);
       natural.push({ top, height, bottom: top + height });
     }
-
+    // natural.forEach((pos, idx) => {
+    //   console.log(
+    //     `Item ${idx} (${items[idx].type}) natural position: top=${pos.top}, height=${pos.height}, bottom=${pos.bottom}`,
+    //   );
+    // });
     // Step 2: Find overlap groups among non-gap items only
     // Gaps are excluded — they represent untracked time and never overlap with entries
-    const groupIndex = new Array<number>(items.length).fill(-1);
+    const groupIndex = new Array<number>(filteredItems.length).fill(-1);
     let currentGroup = 0;
 
-    for (let i = 0; i < items.length; i++) {
+    for (let i = 0; i < filteredItems.length; i++) {
       // Skip gaps — they don't participate in overlap detection
-      if (items[i].type === "gap") continue;
+      if (filteredItems[i].type === "gap") continue;
 
       if (groupIndex[i] === -1) {
         groupIndex[i] = currentGroup;
         let groupBottom = natural[i].bottom;
 
-        for (let j = i + 1; j < items.length; j++) {
-          if (items[j].type === "gap") continue;
-          if (natural[j].top < groupBottom) {
+        for (let j = i + 1; j < filteredItems.length; j++) {
+          if (filteredItems[j].type === "gap") continue;
+          // if a block starts at the same time another block ends, consider that non-overlapping (hence the -1px tolerance)
+          if (natural[j].top < groupBottom - 1) {
             groupIndex[j] = currentGroup;
             groupBottom = Math.max(groupBottom, natural[j].bottom);
           } else {
@@ -181,11 +191,11 @@ export function TimelineCanvas({
     }
 
     // Step 3: Within each group, assign columns using a greedy algorithm
-    const columnAssignment = new Array<number>(items.length).fill(0);
+    const columnAssignment = new Array<number>(filteredItems.length).fill(0);
     const totalColumnsPerGroup = new Map<number, number>();
 
     const groups = new Map<number, number[]>();
-    for (let i = 0; i < items.length; i++) {
+    for (let i = 0; i < filteredItems.length; i++) {
       if (groupIndex[i] === -1) continue; // gaps
       const g = groupIndex[i];
       if (!groups.has(g)) groups.set(g, []);
@@ -229,13 +239,13 @@ export function TimelineCanvas({
 
     let prevBottom = -Infinity;
 
-    for (let i = 0; i < items.length; i++) {
+    for (let i = 0; i < filteredItems.length; i++) {
       const height = natural[i].height;
       let top: number;
       let colIndex = 0;
       let totalCols = 1;
 
-      if (items[i].type === "gap") {
+      if (filteredItems[i].type === "gap") {
         // Gaps always get full-width push-down layout
         top = Math.max(natural[i].top, prevBottom + BLOCK_GAP);
       } else {
@@ -262,7 +272,7 @@ export function TimelineCanvas({
     }
 
     return positions;
-  }, [items, getTop, getHeight, liveNow]);
+  }, [filteredItems, getTop, getHeight, liveNow]);
 
   // Canvas height: max of time-based height and last block bottom
   const lastBottom =
@@ -315,8 +325,9 @@ export function TimelineCanvas({
       />
 
       {/* Entry, gap, and cluster blocks */}
-      {items.map((item, index) => {
-        const { top, height, columnIndex, totalColumns } = resolvedPositions[index];
+      {filteredItems.map((item, index) => {
+        const { top, height, columnIndex, totalColumns } =
+          resolvedPositions[index];
 
         if (item.type === "entry") {
           const e = item.data;
@@ -410,29 +421,29 @@ export function TimelineCanvas({
       {/* Active session chip — attached to the now-indicator line. Starts
           below the line, and flips above once the running session has
           accumulated enough elapsed pixels to fit without overlap. */}
-      {showNowIndicator && runningEntry && (() => {
-        const elapsedPixels =
-          ((liveNow.getTime() - runningEntry.startedAt.getTime()) / 60_000) *
-          PIXELS_PER_MINUTE;
-        const fitsAbove = elapsedPixels >= ACTIVE_CHIP_HEIGHT;
-        const chipTop = fitsAbove
-          ? nowTop - ACTIVE_CHIP_HEIGHT
-          : nowTop;
-        return (
-          <View style={[styles.activeChipWrapper, { top: chipTop }]}>
-            <ActiveSessionChip
-              activityName={runningEntry.activityName}
-              categoryName={runningEntry.categoryName}
-              categoryColor={runningEntry.categoryColor}
-              categoryIcon={runningEntry.categoryIcon}
-              startedAt={runningEntry.startedAt}
-              liveNow={liveNow}
-              attachment={fitsAbove ? 'bottom' : 'top'}
-              onPress={() => onEntryPress(runningEntry.id)}
-            />
-          </View>
-        );
-      })()}
+      {showNowIndicator &&
+        runningEntry &&
+        (() => {
+          const elapsedPixels =
+            ((liveNow.getTime() - runningEntry.startedAt.getTime()) / 60_000) *
+            PIXELS_PER_MINUTE;
+          const fitsAbove = elapsedPixels >= ACTIVE_CHIP_HEIGHT;
+          const chipTop = fitsAbove ? nowTop - ACTIVE_CHIP_HEIGHT : nowTop;
+          return (
+            <View style={[styles.activeChipWrapper, { top: chipTop }]}>
+              <ActiveSessionChip
+                activityName={runningEntry.activityName}
+                categoryName={runningEntry.categoryName}
+                categoryColor={runningEntry.categoryColor}
+                categoryIcon={runningEntry.categoryIcon}
+                startedAt={runningEntry.startedAt}
+                liveNow={liveNow}
+                attachment={fitsAbove ? "bottom" : "top"}
+                onPress={() => onEntryPress(runningEntry.id)}
+              />
+            </View>
+          );
+        })()}
     </ScrollView>
   );
 }
