@@ -66,27 +66,54 @@ export function getTodayDate(timezone: string): string {
 }
 
 /**
- * Get the start of a day (00:00:00) in a given timezone, returned as a Date object in UTC.
+ * Get the UTC instant for local midnight of `dateStr` in the given timezone.
+ * DST-safe. Works under Hermes (no reliance on `new Date(localeString)`).
  */
 export function getStartOfDay(dateStr: string, timezone: string): Date {
-  // Create a date string in the target timezone and convert to UTC
-  const localMidnight = new Date(`${dateStr}T00:00:00`);
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
+  const [y, m, d] = dateStr.split('-').map(Number);
+  // Guess: pretend local midnight is UTC midnight.
+  const guess = Date.UTC(y, m - 1, d);
+  // Measure what local time that guess actually is in the target zone, then
+  // correct by the delta. Two passes handle DST transition days correctly.
+  const adjust = (ms: number): number => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date(ms));
+    const get = (t: string): number =>
+      Number(parts.find((p) => p.type === t)?.value ?? 0);
+    const hour = get('hour') === 24 ? 0 : get('hour');
+    const asIfUTC = Date.UTC(
+      get('year'),
+      get('month') - 1,
+      get('day'),
+      hour,
+      get('minute'),
+      get('second'),
+    );
+    // `asIfUTC - ms` is the tz offset at instant `ms`.
+    return ms - (asIfUTC - guess);
+  };
+  const first = adjust(guess);
+  return new Date(adjust(first));
+}
 
-  // Use a simpler approach: calculate offset
-  const utcDate = new Date(`${dateStr}T00:00:00Z`);
-  const tzTime = new Date(utcDate.toLocaleString('en-US', { timeZone: timezone }));
-  const offset = tzTime.getTime() - utcDate.getTime();
-  return new Date(utcDate.getTime() - offset);
+/**
+ * Get the end of a day (last instant before next local midnight) in a given
+ * timezone, returned as a Date object in UTC. DST-safe — uses the next day's
+ * local midnight rather than adding a fixed 24h.
+ */
+export function getEndOfDay(dateStr: string, timezone: string): Date {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  const nextDateStr = d.toISOString().slice(0, 10);
+  return new Date(getStartOfDay(nextDateStr, timezone).getTime() - 1);
 }
 
 /**

@@ -1,6 +1,11 @@
 import type { TimeEntrySource, TimelineEntry, TimelineGap } from "@/db/models";
 import { TIMELINE_ENTRIES_QUERY, type TimelineEntryRow } from "@/db/queries";
-import { getCurrentTimezone, getTodayDate } from "@/lib/timezone";
+import {
+  getCurrentTimezone,
+  getEndOfDay,
+  getStartOfDay,
+  getTodayDate,
+} from "@/lib/timezone";
 import { useQuery } from "@powersync/react";
 import { useMemo } from "react";
 
@@ -194,26 +199,22 @@ function clusterShortEntries(items: TimelineItem[]): TimelineItem[] {
 export function useTimelineData(selectedDate: string): UseTimelineDataResult {
   const timezone = getCurrentTimezone();
 
-  // Compute UTC boundaries for the selected local date.
-  // We use naive UTC boundaries (date + T00:00:00Z / T23:59:59.999Z) which is
-  // correct enough for local-only mode. The query uses overlap logic so entries
-  // near midnight boundaries are still captured.
-  const { startOfDayUTC, endOfDayUTC } = useMemo(() => {
+  // Compute true local-midnight boundaries for the selected date so entries
+  // spanning midnight are clamped to the user's local day, not to UTC midnight.
+  const { dayStart, dayEnd } = useMemo(() => {
     return {
-      startOfDayUTC: `${selectedDate}T00:00:00.000Z`,
-      endOfDayUTC: `${selectedDate}T23:59:59.999Z`,
+      dayStart: getStartOfDay(selectedDate, timezone),
+      dayEnd: getEndOfDay(selectedDate, timezone),
     };
-  }, [selectedDate]);
+  }, [selectedDate, timezone]);
 
   // Reactive query — auto-updates when time_entries table changes
   const { data: rows, isLoading } = useQuery<TimelineEntryRow>(
     TIMELINE_ENTRIES_QUERY,
-    [endOfDayUTC, startOfDayUTC],
+    [dayEnd.toISOString(), dayStart.toISOString()],
   );
 
   const result = useMemo(() => {
-    const dayStart = new Date(startOfDayUTC);
-    const dayEnd = new Date(endOfDayUTC);
     const now = new Date();
     const isToday = selectedDate === getTodayDate(timezone);
 
@@ -358,7 +359,7 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
     const clusteredItems = clusterShortEntries(items);
 
     return { items: clusteredItems, rangeStartMinutes, rangeEndMinutes };
-  }, [rows, startOfDayUTC, endOfDayUTC, selectedDate, timezone]);
+  }, [rows, dayStart, dayEnd, selectedDate, timezone]);
 
   return {
     items: result.items,
