@@ -289,21 +289,16 @@ export function TimelineCanvas({
         if (isOverlapping) {
           top = natural[i].top;
           colIndex = columnAssignment[i];
-        } else if (variant === "bar") {
-          // Bar-variant blocks sit at their true time position and may
-          // visually overflow their slot — they render under neighbors via
-          // z-index, so never contribute to push-down.
-          top = natural[i].top;
         } else {
           top = Math.max(natural[i].top, prevBottom + BLOCK_GAP);
         }
       }
 
-      // Push-down uses NATURAL bounds only — clamped visual heights must not
-      // leak into neighbor positions.
-      if (variant !== "bar") {
-        prevBottom = Math.max(prevBottom, top + naturalHeight);
-      }
+      // Push-down always uses VISUAL bottom so a later block never visually
+      // collides with a clamped predecessor. Overlap/column detection is a
+      // separate pass (uses natural bounds) so this doesn't reintroduce the
+      // false-columns bug.
+      prevBottom = Math.max(prevBottom, top + visualHeight);
 
       positions.push({
         top,
