@@ -18,6 +18,8 @@ import { TimelineBlock } from "./timeline-block";
 
 const PIXELS_PER_MINUTE = 1.33;
 const MIN_BLOCK_HEIGHT = 40;
+const BAR_THRESHOLD = 24;
+const BAR_HEIGHT = 22;
 const BLOCK_GAP = 4;
 const TIME_AXIS_WIDTH = 52;
 const TRACK_LINE_LEFT = TIME_AXIS_WIDTH;
@@ -118,23 +120,28 @@ export function TimelineCanvas({
     [rangeStartMinutes, timezone],
   );
 
-  const getHeight = useCallback(
-    (startDate: Date, endDate: Date, isRunning = false): number => {
+  const getNaturalHeight = useCallback(
+    (startDate: Date, endDate: Date): number => {
       const startMins = minutesSinceMidnight(startDate, timezone);
       const endMins = minutesSinceMidnight(endDate, timezone);
       const durationMins = Math.max(0, endMins - startMins);
-      const raw = durationMins * PIXELS_PER_MINUTE;
-      // Running entries skip the min-height clamp so their bottom edge stays
-      // exactly at the "now" indicator line instead of overshooting it.
-      return isRunning ? raw : Math.max(MIN_BLOCK_HEIGHT, raw);
+      return durationMins * PIXELS_PER_MINUTE;
     },
     [timezone],
   );
 
   // Resolve block positions with overlap detection for side-by-side layout
   const resolvedPositions = useMemo(() => {
-    // Step 1: Compute natural positions for all items
-    const natural: { top: number; height: number; bottom: number }[] = [];
+    // Step 1: Compute natural (unclamped, time-based) positions + visual
+    // heights. Layout math (overlap, push-down, canvas height) uses
+    // `naturalHeight`; rendering uses `visualHeight`.
+    const natural: {
+      top: number;
+      naturalHeight: number;
+      visualHeight: number;
+      bottom: number;
+      variant: "bar" | "normal";
+    }[] = [];
     for (const item of filteredItems) {
       let startDate: Date;
       let endDate: Date;
@@ -155,8 +162,33 @@ export function TimelineCanvas({
       }
 
       const top = getTop(startDate);
-      const height = getHeight(startDate, endDate, isRunning);
-      natural.push({ top, height, bottom: top + height });
+      const naturalHeight = getNaturalHeight(startDate, endDate);
+
+      // Only regular entries (non-running, non-gap, non-cluster) qualify for
+      // the bar-variant: clusters already summarize short entries, gaps have
+      // their own MIN_GAP threshold, running entries live-grow.
+      const isEntry = item.type === "entry";
+      const isBar =
+        isEntry && !isRunning && naturalHeight < BAR_THRESHOLD;
+
+      let visualHeight: number;
+      if (isBar) {
+        visualHeight = BAR_HEIGHT;
+      } else if (isRunning) {
+        // Running entries skip the min-height clamp so their bottom edge stays
+        // exactly at the "now" indicator line.
+        visualHeight = naturalHeight;
+      } else {
+        visualHeight = Math.max(MIN_BLOCK_HEIGHT, naturalHeight);
+      }
+
+      natural.push({
+        top,
+        naturalHeight,
+        visualHeight,
+        bottom: top + naturalHeight,
+        variant: isBar ? "bar" : "normal",
+      });
     }
     // natural.forEach((pos, idx) => {
     //   console.log(
@@ -235,12 +267,13 @@ export function TimelineCanvas({
       height: number;
       columnIndex: number;
       totalColumns: number;
+      variant: "bar" | "normal";
     }[] = [];
 
     let prevBottom = -Infinity;
 
     for (let i = 0; i < filteredItems.length; i++) {
-      const height = natural[i].height;
+      const { naturalHeight, visualHeight, variant } = natural[i];
       let top: number;
       let colIndex = 0;
       let totalCols = 1;
@@ -256,30 +289,42 @@ export function TimelineCanvas({
         if (isOverlapping) {
           top = natural[i].top;
           colIndex = columnAssignment[i];
+        } else if (variant === "bar") {
+          // Bar-variant blocks sit at their true time position and may
+          // visually overflow their slot — they render under neighbors via
+          // z-index, so never contribute to push-down.
+          top = natural[i].top;
         } else {
           top = Math.max(natural[i].top, prevBottom + BLOCK_GAP);
         }
       }
 
-      prevBottom = Math.max(prevBottom, top + height);
+      // Push-down uses NATURAL bounds only — clamped visual heights must not
+      // leak into neighbor positions.
+      if (variant !== "bar") {
+        prevBottom = Math.max(prevBottom, top + naturalHeight);
+      }
 
       positions.push({
         top,
-        height,
+        height: visualHeight,
         columnIndex: colIndex,
         totalColumns: totalCols,
+        variant,
       });
     }
 
     return positions;
-  }, [filteredItems, getTop, getHeight, liveNow]);
+  }, [filteredItems, getTop, getNaturalHeight, liveNow]);
 
-  // Canvas height: max of time-based height and last block bottom
-  const lastBottom =
-    resolvedPositions.length > 0
-      ? resolvedPositions[resolvedPositions.length - 1].top +
-        resolvedPositions[resolvedPositions.length - 1].height
-      : 0;
+  // Canvas height: max of time-based height and last block's visual bottom.
+  // We max across all items (not just the last) because a bar-variant item
+  // may be the last-positioned but have a smaller visual bottom than a
+  // naturally taller earlier block.
+  const lastBottom = resolvedPositions.reduce(
+    (acc, p) => Math.max(acc, p.top + p.height),
+    0,
+  );
   const resolvedCanvasHeight = Math.max(canvasHeight, lastBottom);
 
   // Current time indicator position
@@ -326,7 +371,7 @@ export function TimelineCanvas({
 
       {/* Entry, gap, and cluster blocks */}
       {filteredItems.map((item, index) => {
-        const { top, height, columnIndex, totalColumns } =
+        const { top, height, columnIndex, totalColumns, variant } =
           resolvedPositions[index];
 
         if (item.type === "entry") {
@@ -338,10 +383,13 @@ export function TimelineCanvas({
             totalColumns > 1
               ? getColumnStyle(totalColumns, columnIndex)
               : { left: BLOCK_LEFT, right: SPACING.lg };
+          // Bar variant renders under normal blocks so any visual overflow
+          // from the min tap-target height is covered by the following block.
+          const zIndex = variant === "bar" ? 1 : 5;
           return (
             <View
               key={e.id}
-              style={[styles.blockWrapper, { top, height }, entryStyle]}
+              style={[styles.blockWrapper, { top, height, zIndex }, entryStyle]}
             >
               <TimelineBlock
                 activityName={e.activityName}
@@ -354,6 +402,7 @@ export function TimelineCanvas({
                 continuesBefore={e.continuesBefore}
                 continuesAfter={e.continuesAfter}
                 height={height}
+                variant={variant}
                 onPress={() => onEntryPress(e.id)}
               />
             </View>
@@ -480,7 +529,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    zIndex: 10,
+    // Must render above every block variant, including clamped/bar blocks
+    // whose visual extends past the block's real end time.
+    zIndex: 30,
   },
   activeChipWrapper: {
     position: "absolute",

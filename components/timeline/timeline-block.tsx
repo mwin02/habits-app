@@ -17,6 +17,7 @@ interface TimelineBlockProps {
   continuesBefore?: boolean;
   continuesAfter?: boolean;
   height: number;
+  variant?: 'bar' | 'normal';
   onPress: () => void;
 }
 
@@ -31,9 +32,37 @@ export function TimelineBlock({
   continuesBefore = false,
   continuesAfter = false,
   height,
+  variant = 'normal',
   onPress,
 }: TimelineBlockProps): React.ReactElement {
   const isCompact = height < 64;
+
+  if (variant === 'bar') {
+    return (
+      <Pressable
+        onPress={onPress}
+        hitSlop={{ top: 6, bottom: 6, left: 0, right: 0 }}
+        style={({ pressed }) => [
+          styles.barContainer,
+          {
+            height,
+            backgroundColor: categoryColor + '26', // 15% opacity
+          },
+          pressed && styles.pressed,
+        ]}
+      >
+        <View style={[styles.barDot, { backgroundColor: categoryColor }]} />
+        <CategoryIcon icon={categoryIcon} size={12} color={categoryColor} />
+        <Text style={[styles.barName, { color: categoryColor }]} numberOfLines={1}>
+          {activityName}
+        </Text>
+        <Text style={styles.barDuration}>
+          {durationSeconds != null ? formatDuration(durationSeconds) : '—'}
+        </Text>
+        {isRunning && <ActiveDot />}
+      </Pressable>
+    );
+  }
 
   return (
     <Pressable
@@ -182,5 +211,27 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+  },
+  // Bar variant (very short blocks)
+  barContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+  },
+  barDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  barName: {
+    ...TYPOGRAPHY.labelSm,
+    flex: 1,
+  },
+  barDuration: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.onSurfaceVariant,
   },
 });
