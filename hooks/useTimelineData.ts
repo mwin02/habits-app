@@ -52,8 +52,13 @@ export interface UseTimelineDataResult {
 /** Minimum gap duration (in seconds) to show as an "Untracked" block */
 const MIN_GAP_SECONDS = 30 * 60; // 30 minutes
 
-/** Entries shorter than this (in seconds) are candidates for clustering */
-const SHORT_ENTRY_THRESHOLD_SECONDS = 15 * 60; // 15 minutes
+/**
+ * Entries shorter than this (in seconds) are candidates for clustering.
+ * Tuned to match the canvas's MIN_BLOCK_HEIGHT (40px @ 1.33px/min ≈ 30min):
+ * anything below this gets padded up visually, breaking hour-label alignment
+ * when several stack consecutively — so we catch them at the source.
+ */
+const SHORT_ENTRY_THRESHOLD_SECONDS = 30 * 60; // 30 minutes
 
 /** Minimum number of consecutive short entries to form a cluster */
 const MIN_CLUSTER_SIZE = 2;

@@ -20,7 +20,14 @@ const PIXELS_PER_MINUTE = 1.33;
 const MIN_BLOCK_HEIGHT = 40;
 const BAR_THRESHOLD = 24;
 const BAR_HEIGHT = 22;
-const BLOCK_GAP = 4;
+/**
+ * Extra px forced between visually-colliding blocks during push-down.
+ * Kept at 0 so adjacent entries (no natural time gap) stay glued to their
+ * real time positions — otherwise the gap accumulates across a run of
+ * consecutive blocks and hour labels drift out of alignment. Block visual
+ * separation comes from borderRadius + category color, not a spacer.
+ */
+const BLOCK_GAP = 0;
 const TIME_AXIS_WIDTH = 52;
 const TRACK_LINE_LEFT = TIME_AXIS_WIDTH;
 const BLOCK_LEFT = TIME_AXIS_WIDTH + 16;
