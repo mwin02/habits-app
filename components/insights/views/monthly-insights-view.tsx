@@ -1,0 +1,56 @@
+import { ActivityBreakdown } from "@/components/insights/activity-breakdown";
+import { ActualVsIdeal } from "@/components/insights/actual-vs-ideal";
+import { CategoryBreakdown } from "@/components/insights/category-breakdown";
+import { TrackingCoverage } from "@/components/insights/tracking-coverage";
+import { SPACING } from "@/constants/theme";
+import type { CategoryInsight, DayCoverage } from "@/db/models";
+import React from "react";
+import { ScrollView, StyleSheet } from "react-native";
+
+interface MonthlyInsightsViewProps {
+  selectedDate: string;
+  categoryInsights: CategoryInsight[];
+  coverage: DayCoverage;
+  totalTrackedMinutes: number;
+}
+
+export function MonthlyInsightsView({
+  selectedDate,
+  categoryInsights,
+  coverage,
+  totalTrackedMinutes,
+}: MonthlyInsightsViewProps): React.ReactElement {
+  return (
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <CategoryBreakdown
+        categoryInsights={categoryInsights}
+        totalTrackedMinutes={totalTrackedMinutes}
+      />
+
+      <ActualVsIdeal categoryInsights={categoryInsights} />
+
+      <ActivityBreakdown
+        categoryInsights={categoryInsights}
+        selectedDate={selectedDate}
+        period="monthly"
+      />
+
+      <TrackingCoverage coverage={coverage} period="monthly" />
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING["5xl"],
+    gap: SPACING.lg,
+  },
+});
