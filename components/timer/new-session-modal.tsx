@@ -176,21 +176,23 @@ export function NewSessionModal({
                       key={category.id}
                       style={[
                         styles.categoryCard,
-                        isSelected && styles.categoryCardSelected,
+                        {
+                          backgroundColor: isSelected
+                            ? category.color + "26"
+                            : category.color + "12",
+                        },
                       ]}
                       onPress={() => handleCategoryPress(category.id)}
                     >
                       <CategoryIcon
                         icon={category.icon ?? "circle"}
                         size={22}
-                        color={
-                          isSelected ? COLORS.primary : COLORS.onSurfaceVariant
-                        }
+                        color={category.color}
                       />
                       <Text
                         style={[
                           styles.categoryCardName,
-                          isSelected && styles.categoryCardNameSelected,
+                          { color: category.color },
                         ]}
                         numberOfLines={1}
                       >
