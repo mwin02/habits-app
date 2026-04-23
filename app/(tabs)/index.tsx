@@ -6,6 +6,7 @@ import { endForgottenEntry, deleteEntry } from "@/db/queries";
 import { useTimer } from "@/hooks/useTimer";
 import { useForgottenTimer } from "@/hooks/useForgottenTimer";
 import { useCategoriesWithActivities } from "@/hooks/useCategoriesWithActivities";
+import { useQuickSwitchData } from "@/hooks/useQuickSwitchData";
 import { NewSessionModal } from "@/components/timer/new-session-modal";
 import { CreateActivityModal } from "@/components/timer/create-activity-modal";
 import { Feather } from "@expo/vector-icons";
@@ -30,6 +31,7 @@ export default function HomeScreen(): React.ReactElement {
   } = useTimer();
   const { categories, isLoading: categoriesLoading } =
     useCategoriesWithActivities();
+  const { categories: quickSwitchCategories } = useQuickSwitchData();
   const { forgottenEntry, dismissForgotten } = useForgottenTimer();
   const [modalVisible, setModalVisible] = useState(false);
   const [createActivityModalVisible, setCreateActivityModalVisible] =
@@ -107,7 +109,7 @@ export default function HomeScreen(): React.ReactElement {
 
         {/* Quick Switch Carousel */}
         <QuickSwitchSection
-          categories={categories}
+          categories={quickSwitchCategories}
           activeActivityId={runningEntry?.activityId ?? null}
           onActivityPress={handleActivityPress}
         />
