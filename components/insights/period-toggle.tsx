@@ -12,6 +12,7 @@ interface PeriodToggleProps {
 const PERIODS: { key: InsightsPeriod; label: string }[] = [
   { key: 'daily', label: 'Daily' },
   { key: 'weekly', label: 'Weekly' },
+  { key: 'monthly', label: 'Monthly' },
 ];
 
 export function PeriodToggle({

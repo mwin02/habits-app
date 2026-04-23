@@ -13,7 +13,7 @@ import { useMemo } from "react";
 // Types
 // ──────────────────────────────────────────────
 
-export type InsightsPeriod = "daily" | "weekly";
+export type InsightsPeriod = "daily" | "weekly" | "monthly";
 
 export interface UseInsightsDataResult {
   /** Per-category breakdown with actual vs ideal */
@@ -37,6 +37,21 @@ export const MINUTES_PER_DAY = 1440;
  * Get the Monday (start) and Sunday (end) of the week containing the given date.
  * Returns YYYY-MM-DD strings.
  */
+/**
+ * Get the first and last day of the calendar month containing the given date.
+ * Returns YYYY-MM-DD strings.
+ */
+export function getMonthRange(dateStr: string): {
+  monthStart: string;
+  monthEnd: string;
+} {
+  const [y, m] = dateStr.split("-").map(Number);
+  const firstDay = new Date(Date.UTC(y, m - 1, 1, 12));
+  const lastDay = new Date(Date.UTC(y, m, 0, 12)); // day 0 of next month = last day of this month
+  const fmt = (d: Date): string => d.toISOString().slice(0, 10);
+  return { monthStart: fmt(firstDay), monthEnd: fmt(lastDay) };
+}
+
 function getWeekRange(dateStr: string): { weekStart: string; weekEnd: string } {
   const date = new Date(`${dateStr}T12:00:00.000Z`); // noon to avoid DST issues
   const day = date.getUTCDay(); // 0 = Sunday
@@ -99,12 +114,22 @@ export function useInsightsData(
       };
     }
 
-    // Weekly: Mon–Sun
-    const { weekStart, weekEnd } = getWeekRange(selectedDate);
+    if (period === "weekly") {
+      // Weekly: Mon–Sun
+      const { weekStart, weekEnd } = getWeekRange(selectedDate);
+      return {
+        startOfRangeUTC: getStartOfDay(weekStart, timezone).toISOString(),
+        endOfRangeUTC: getEndOfDay(weekEnd, timezone).toISOString(),
+        numDays: countDaysInRange(weekStart, weekEnd, today),
+      };
+    }
+
+    // Monthly: first–last of calendar month
+    const { monthStart, monthEnd } = getMonthRange(selectedDate);
     return {
-      startOfRangeUTC: getStartOfDay(weekStart, timezone).toISOString(),
-      endOfRangeUTC: getEndOfDay(weekEnd, timezone).toISOString(),
-      numDays: countDaysInRange(weekStart, weekEnd, today),
+      startOfRangeUTC: getStartOfDay(monthStart, timezone).toISOString(),
+      endOfRangeUTC: getEndOfDay(monthEnd, timezone).toISOString(),
+      numDays: countDaysInRange(monthStart, monthEnd, today),
     };
   }, [selectedDate, period, timezone]);
 

@@ -1,6 +1,7 @@
 import { ActivityBreakdown } from "@/components/insights/activity-breakdown";
 import { ActualVsIdeal } from "@/components/insights/actual-vs-ideal";
 import { CategoryBreakdown } from "@/components/insights/category-breakdown";
+import { MonthNavHeader } from "@/components/insights/month-nav-header";
 import { PeriodToggle } from "@/components/insights/period-toggle";
 import { TrackingCoverage } from "@/components/insights/tracking-coverage";
 import { WeekNavHeader } from "@/components/insights/week-nav-header";
@@ -26,8 +27,14 @@ export default function InsightsScreen(): React.ReactElement {
   const [period, setPeriod] = useState<InsightsPeriod>("daily");
   const [dailyDate, setDailyDate] = useState<string>(today);
   const [weeklyDate, setWeeklyDate] = useState<string>(today);
+  const [monthlyDate, setMonthlyDate] = useState<string>(today);
 
-  const activeDate = period === "daily" ? dailyDate : weeklyDate;
+  const activeDate =
+    period === "daily"
+      ? dailyDate
+      : period === "weekly"
+        ? weeklyDate
+        : monthlyDate;
   const { categoryInsights, coverage, totalTrackedMinutes, isLoading } =
     useInsightsData(activeDate, period);
 
@@ -49,8 +56,10 @@ export default function InsightsScreen(): React.ReactElement {
 
       {period === "daily" ? (
         <DateHeader selectedDate={dailyDate} onDateChange={setDailyDate} />
-      ) : (
+      ) : period === "weekly" ? (
         <WeekNavHeader selectedDate={weeklyDate} onDateChange={setWeeklyDate} />
+      ) : (
+        <MonthNavHeader selectedDate={monthlyDate} onDateChange={setMonthlyDate} />
       )}
 
       {isLoading ? (

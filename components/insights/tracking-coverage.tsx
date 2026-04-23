@@ -6,7 +6,7 @@ import { Animated, StyleSheet, Text, View } from "react-native";
 
 interface TrackingCoverageProps {
   coverage: DayCoverage;
-  period: "daily" | "weekly";
+  period: "daily" | "weekly" | "monthly";
 }
 
 export function TrackingCoverage({
@@ -42,7 +42,9 @@ export function TrackingCoverage({
       </View>
 
       {/* Subtitle */}
-      <Text style={styles.subtitle}>{trackedHours} hours tracked today</Text>
+      <Text style={styles.subtitle}>
+        {trackedHours} hours tracked {period === "daily" ? "today" : period === "weekly" ? "this week" : "this month"}
+      </Text>
 
       {/* Progress bar */}
       <View style={styles.progressTrack}>
@@ -69,9 +71,14 @@ export function TrackingCoverage({
 
 function getCoverageMessage(
   percent: number,
-  period: "daily" | "weekly",
+  period: "daily" | "weekly" | "monthly",
 ): string {
-  const periodLabel = period === "daily" ? "today" : "this week";
+  const periodLabel =
+    period === "daily"
+      ? "today"
+      : period === "weekly"
+        ? "this week"
+        : "this month";
 
   if (percent >= 90)
     return `Amazing! You've tracked almost all of ${periodLabel}.`;
