@@ -1,6 +1,7 @@
 import { ActivityBreakdown } from "@/components/insights/activity-breakdown";
 import { ActualVsIdeal } from "@/components/insights/actual-vs-ideal";
 import { CategoryBreakdown } from "@/components/insights/category-breakdown";
+import { DayOfWeekBars } from "@/components/insights/day-of-week-bars";
 import { TrackingCoverage } from "@/components/insights/tracking-coverage";
 import { SPACING } from "@/constants/theme";
 import type { CategoryInsight, DayCoverage } from "@/db/models";
@@ -26,6 +27,8 @@ export function WeeklyInsightsView({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
+      <DayOfWeekBars weekDate={selectedDate} />
+
       <CategoryBreakdown
         categoryInsights={categoryInsights}
         totalTrackedMinutes={totalTrackedMinutes}

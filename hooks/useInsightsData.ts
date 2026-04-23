@@ -52,7 +52,10 @@ export function getMonthRange(dateStr: string): {
   return { monthStart: fmt(firstDay), monthEnd: fmt(lastDay) };
 }
 
-function getWeekRange(dateStr: string): { weekStart: string; weekEnd: string } {
+export function getWeekRange(dateStr: string): {
+  weekStart: string;
+  weekEnd: string;
+} {
   const date = new Date(`${dateStr}T12:00:00.000Z`); // noon to avoid DST issues
   const day = date.getUTCDay(); // 0 = Sunday
   const diffToMonday = day === 0 ? -6 : 1 - day;
