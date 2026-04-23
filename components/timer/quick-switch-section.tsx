@@ -1,8 +1,10 @@
-import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import type { CategoryWithActivities } from '@/db/models';
-import { QuickSwitchCard } from '@/components/timer/quick-switch-card';
-import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/theme';
+import { QuickSwitchCard } from "@/components/timer/quick-switch-card";
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import type { CategoryWithActivities } from "@/db/models";
+import { Feather } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 interface QuickSwitchSectionProps {
   categories: CategoryWithActivities[];
@@ -15,6 +17,8 @@ export function QuickSwitchSection({
   activeActivityId,
   onActivityPress,
 }: QuickSwitchSectionProps): React.ReactElement {
+  const router = useRouter();
+
   // Only show categories that have at least one activity
   const nonEmpty = categories.filter((c) => c.activities.length > 0);
 
@@ -23,7 +27,16 @@ export function QuickSwitchSection({
       {/* Section header */}
       <View style={styles.headerRow}>
         <Text style={styles.heading}>Quick Switch</Text>
-        <Text style={styles.label}>Presets</Text>
+        <Pressable
+          onPress={() => router.push("/manage-activities")}
+          style={styles.manageButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Manage activities"
+        >
+          <Feather name="settings" size={16} color={COLORS.onSurfaceVariant} />
+          <Text style={styles.label}>Manage Activites</Text>
+        </Pressable>
       </View>
 
       {/* Horizontal carousel */}
@@ -47,12 +60,12 @@ export function QuickSwitchSection({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: SPACING['3xl'],
+    marginBottom: SPACING["3xl"],
   },
   headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
     marginBottom: SPACING.lg,
   },
   heading: {
@@ -62,6 +75,14 @@ const styles = StyleSheet.create({
   label: {
     ...TYPOGRAPHY.labelUppercase,
     color: COLORS.onSurfaceVariant,
+  },
+  manageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.full,
   },
   scrollContent: {
     gap: SPACING.lg,

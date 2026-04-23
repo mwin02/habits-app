@@ -97,6 +97,10 @@ function RootLayoutNav() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          <Stack.Screen
+            name="manage-activities"
+            options={{ title: 'Manage Activities', headerBackTitle: 'Back' }}
+          />
         </Stack>
       </ThemeProvider>
     </PowerSyncContext.Provider>

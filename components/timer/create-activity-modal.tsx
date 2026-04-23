@@ -1,10 +1,10 @@
 import { CategoryIcon } from "@/components/common/category-icon";
 import { GradientButton } from "@/components/common/gradient-button";
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
-import type { CategoryWithActivities } from "@/db/models";
-import { createActivity } from "@/db/queries";
+import type { ActivityItem, CategoryWithActivities } from "@/db/models";
+import { createActivity, updateActivity } from "@/db/queries";
 import { Feather } from "@expo/vector-icons";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -22,19 +22,36 @@ interface CreateActivityModalProps {
   visible: boolean;
   onClose: () => void;
   categories: CategoryWithActivities[];
+  /** When provided, the modal operates in edit mode for this activity */
+  initialActivity?: ActivityItem | null;
+  /** Pre-select this category when opening in create mode */
+  initialCategoryId?: string | null;
 }
 
 export function CreateActivityModal({
   visible,
   onClose,
   categories,
+  initialActivity,
+  initialCategoryId,
 }: CreateActivityModalProps): React.ReactElement {
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState("");
+  const isEdit = !!initialActivity;
+  const [name, setName] = useState(initialActivity?.name ?? "");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
-    null,
+    initialActivity?.categoryId ?? initialCategoryId ?? null,
   );
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setName(initialActivity?.name ?? "");
+      setSelectedCategoryId(
+        initialActivity?.categoryId ?? initialCategoryId ?? null,
+      );
+      setSubmitting(false);
+    }
+  }, [visible, initialActivity, initialCategoryId]);
 
   const reset = useCallback((): void => {
     setName("");
@@ -50,21 +67,28 @@ export function CreateActivityModal({
   const trimmedName = name.trim();
   const canSubmit = trimmedName.length > 0 && selectedCategoryId !== null && !submitting;
 
-  const handleCreate = useCallback(async (): Promise<void> => {
+  const handleSubmit = useCallback(async (): Promise<void> => {
     if (!canSubmit || !selectedCategoryId) return;
     setSubmitting(true);
     try {
-      await createActivity({
-        categoryId: selectedCategoryId,
-        name: trimmedName,
-      });
+      if (isEdit && initialActivity) {
+        await updateActivity(initialActivity.id, {
+          name: trimmedName,
+          categoryId: selectedCategoryId,
+        });
+      } else {
+        await createActivity({
+          categoryId: selectedCategoryId,
+          name: trimmedName,
+        });
+      }
       reset();
       onClose();
     } catch (err) {
       setSubmitting(false);
-      console.error("Failed to create activity", err);
+      console.error("Failed to save activity", err);
     }
-  }, [canSubmit, selectedCategoryId, trimmedName, reset, onClose]);
+  }, [canSubmit, selectedCategoryId, trimmedName, reset, onClose, isEdit, initialActivity]);
 
   const categoryRows: CategoryWithActivities[][] = [];
   for (let i = 0; i < categories.length; i += 2) {
@@ -91,8 +115,12 @@ export function CreateActivityModal({
 
           <View style={styles.header}>
             <View>
-              <Text style={styles.headerTitle}>New Activity</Text>
-              <Text style={styles.headerSubtitle}>Add a custom activity</Text>
+              <Text style={styles.headerTitle}>
+                {isEdit ? "Edit Activity" : "New Activity"}
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                {isEdit ? "Rename or reassign" : "Add a custom activity"}
+              </Text>
             </View>
             <Pressable onPress={handleClose} style={styles.closeButton}>
               <Feather name="x" size={22} color={COLORS.onSurface} />
@@ -131,21 +159,23 @@ export function CreateActivityModal({
                       key={category.id}
                       style={[
                         styles.categoryCard,
-                        isSelected && styles.categoryCardSelected,
+                        {
+                          backgroundColor: isSelected
+                            ? category.color + "26"
+                            : category.color + "12",
+                        },
                       ]}
                       onPress={() => setSelectedCategoryId(category.id)}
                     >
                       <CategoryIcon
                         icon={category.icon ?? "circle"}
                         size={22}
-                        color={
-                          isSelected ? COLORS.primary : COLORS.onSurfaceVariant
-                        }
+                        color={category.color}
                       />
                       <Text
                         style={[
                           styles.categoryCardName,
-                          isSelected && styles.categoryCardNameSelected,
+                          { color: category.color },
                         ]}
                         numberOfLines={1}
                       >
@@ -160,11 +190,23 @@ export function CreateActivityModal({
 
           <GradientButton
             shape="pill"
-            label={submitting ? "Creating..." : "Create Activity"}
-            onPress={handleCreate}
+            label={
+              submitting
+                ? isEdit
+                  ? "Saving..."
+                  : "Creating..."
+                : isEdit
+                  ? "Save Changes"
+                  : "Create Activity"
+            }
+            onPress={handleSubmit}
             disabled={!canSubmit}
           >
-            <Feather name="plus" size={18} color={COLORS.onPrimary} />
+            <Feather
+              name={isEdit ? "check" : "plus"}
+              size={18}
+              color={COLORS.onPrimary}
+            />
           </GradientButton>
         </View>
       </KeyboardAvoidingView>

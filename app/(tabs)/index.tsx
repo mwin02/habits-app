@@ -8,12 +8,9 @@ import { useForgottenTimer } from "@/hooks/useForgottenTimer";
 import { useCategoriesWithActivities } from "@/hooks/useCategoriesWithActivities";
 import { useQuickSwitchData } from "@/hooks/useQuickSwitchData";
 import { NewSessionModal } from "@/components/timer/new-session-modal";
-import { CreateActivityModal } from "@/components/timer/create-activity-modal";
-import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -34,8 +31,6 @@ export default function HomeScreen(): React.ReactElement {
   const { categories: quickSwitchCategories } = useQuickSwitchData();
   const { forgottenEntry, dismissForgotten } = useForgottenTimer();
   const [modalVisible, setModalVisible] = useState(false);
-  const [createActivityModalVisible, setCreateActivityModalVisible] =
-    useState(false);
 
   const handleForgottenStop = useCallback(
     async (endedAt: Date): Promise<void> => {
@@ -113,15 +108,6 @@ export default function HomeScreen(): React.ReactElement {
           activeActivityId={runningEntry?.activityId ?? null}
           onActivityPress={handleActivityPress}
         />
-
-        {/* New Activity Button */}
-        <Pressable
-          style={styles.newActivityButton}
-          onPress={() => setCreateActivityModalVisible(true)}
-        >
-          <Feather name="plus-circle" size={18} color={COLORS.primary} />
-          <Text style={styles.newActivityLabel}>New Activity</Text>
-        </Pressable>
       </ScrollView>
 
       {/* New Session Modal */}
@@ -129,13 +115,6 @@ export default function HomeScreen(): React.ReactElement {
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onStartActivity={handleStartFromModal}
-        categories={categories}
-      />
-
-      {/* Create Activity Modal */}
-      <CreateActivityModal
-        visible={createActivityModalVisible}
-        onClose={() => setCreateActivityModalVisible(false)}
         categories={categories}
       />
 
@@ -171,18 +150,5 @@ const styles = StyleSheet.create({
   },
   timerCardWrapper: {
     marginBottom: SPACING["3xl"],
-  },
-  newActivityButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    alignSelf: "center",
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
-  },
-  newActivityLabel: {
-    ...TYPOGRAPHY.button,
-    color: COLORS.primary,
   },
 });
