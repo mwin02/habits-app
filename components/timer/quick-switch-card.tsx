@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { CategoryWithActivities } from '@/db/models';
 import { CategoryIcon } from '@/components/common/category-icon';
@@ -11,16 +11,14 @@ interface QuickSwitchCardProps {
   onActivityPress: (activityId: string) => void;
 }
 
-/** Max activities shown per card in the carousel */
-const MAX_ACTIVITIES = 2;
+/** Max height for the activities list — shows ~2 activities, rest scroll */
+const ACTIVITIES_MAX_HEIGHT = 140;
 
 export function QuickSwitchCard({
   category,
   activeActivityId,
   onActivityPress,
 }: QuickSwitchCardProps): React.ReactElement {
-  const visibleActivities = category.activities.slice(0, MAX_ACTIVITIES);
-
   return (
     <View style={styles.card}>
       {/* Category header */}
@@ -33,26 +31,35 @@ export function QuickSwitchCard({
         </Text>
       </View>
 
-      {/* Activity buttons */}
-      {visibleActivities.map((activity) => {
-        const isActive = activity.id === activeActivityId;
-        return (
-          <Pressable
-            key={activity.id}
-            style={[styles.activityButton, isActive && styles.activityButtonActive]}
-            onPress={() => onActivityPress(activity.id)}
-          >
-            <View style={styles.activityInfo}>
-              <Text style={styles.activityName}>{activity.name}</Text>
-            </View>
-            <Feather
-              name="play-circle"
-              size={20}
-              color={isActive ? COLORS.primary : COLORS.onSurfaceVariant}
-            />
-          </Pressable>
-        );
-      })}
+      {/* Vertically scrollable activity buttons */}
+      <ScrollView
+        style={styles.activitiesScroll}
+        contentContainerStyle={styles.activitiesContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+      >
+        {category.activities.map((activity) => {
+          const isActive = activity.id === activeActivityId;
+          return (
+            <Pressable
+              key={activity.id}
+              style={[styles.activityButton, isActive && styles.activityButtonActive]}
+              onPress={() => onActivityPress(activity.id)}
+            >
+              <View style={styles.activityInfo}>
+                <Text style={styles.activityName} numberOfLines={1}>
+                  {activity.name}
+                </Text>
+              </View>
+              <Feather
+                name="play-circle"
+                size={20}
+                color={isActive ? COLORS.primary : COLORS.onSurfaceVariant}
+              />
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -80,6 +87,12 @@ const styles = StyleSheet.create({
   },
   categoryLabel: {
     ...TYPOGRAPHY.labelSm,
+  },
+  activitiesScroll: {
+    maxHeight: ACTIVITIES_MAX_HEIGHT,
+  },
+  activitiesContent: {
+    gap: SPACING.md,
   },
   activityButton: {
     flexDirection: 'row',
