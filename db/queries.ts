@@ -703,22 +703,24 @@ export async function updateNotificationPreferences(
 }
 
 /**
- * Returns rows of duration_seconds for the given category's completed entries
+ * Returns rows of duration_seconds for the given activity's completed entries
  * in the last 30 days, excluding retroactive/import sources and clipping to
  * [60s, 43200s] to drop accidental taps and forgotten-timer outliers.
  */
 export const MEDIAN_DURATION_QUERY = `
-  SELECT te.duration_seconds AS duration_seconds
-  FROM time_entries te
-  JOIN activities a ON a.id = te.activity_id
-  WHERE a.category_id = ?
-    AND te.deleted_at IS NULL
-    AND te.ended_at IS NOT NULL
-    AND te.started_at >= ?
-    AND te.source IN ('timer','manual')
-    AND te.duration_seconds BETWEEN 60 AND 43200
-  ORDER BY te.duration_seconds
+  SELECT duration_seconds
+  FROM time_entries
+  WHERE activity_id = ?
+    AND deleted_at IS NULL
+    AND ended_at IS NOT NULL
+    AND started_at >= ?
+    AND source IN ('timer','manual')
+    AND duration_seconds BETWEEN 60 AND 43200
+  ORDER BY duration_seconds
 `;
+
+/** Minimum samples required to trust the per-activity median. */
+export const LONG_RUNNING_MIN_SAMPLES = 3;
 
 function median(sortedValues: number[]): number {
   const n = sortedValues.length;
@@ -729,19 +731,22 @@ function median(sortedValues: number[]): number {
 }
 
 /**
- * Compute the long-running reminder threshold (seconds) for a category.
+ * Compute the long-running reminder threshold (seconds) for an activity.
  * threshold = max(1.5 * median(recent durations), 45 min).
- * Falls back to 45 min floor when there is no recent history.
+ * Falls back to the 45 min floor when the activity has fewer than
+ * LONG_RUNNING_MIN_SAMPLES completed entries in the last 30 days — a single
+ * noisy sample can set an unreasonable threshold for activities that
+ * usually run much longer.
  */
-export async function computeCategoryThreshold(
-  categoryId: string
+export async function computeActivityThreshold(
+  activityId: string
 ): Promise<number> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const rows = await db.getAll<{ duration_seconds: number }>(
     MEDIAN_DURATION_QUERY,
-    [categoryId, thirtyDaysAgo]
+    [activityId, thirtyDaysAgo]
   );
-  if (rows.length === 0) return LONG_RUNNING_MIN_THRESHOLD_SECONDS;
+  if (rows.length < LONG_RUNNING_MIN_SAMPLES) return LONG_RUNNING_MIN_THRESHOLD_SECONDS;
   const sorted = rows.map((r) => r.duration_seconds);
   const m = median(sorted);
   return Math.max(Math.round(1.5 * m), LONG_RUNNING_MIN_THRESHOLD_SECONDS);

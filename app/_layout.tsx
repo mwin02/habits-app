@@ -25,6 +25,7 @@ import "react-native-reanimated";
 
 import { useColorScheme } from "@/components/useColorScheme";
 import { seedNotificationPreferencesIfNeeded, seedPresetsIfNeeded } from "@/db/seed";
+import { useNotificationScheduler } from "@/hooks/useNotificationScheduler";
 import { db } from "@/lib/powersync";
 
 export {
@@ -98,6 +99,7 @@ function RootLayoutNav() {
 
   return (
     <PowerSyncContext.Provider value={db}>
+      <NotificationSchedulerMount />
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -122,4 +124,9 @@ function RootLayoutNav() {
       </ThemeProvider>
     </PowerSyncContext.Provider>
   );
+}
+
+function NotificationSchedulerMount(): null {
+  useNotificationScheduler();
+  return null;
 }
