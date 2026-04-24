@@ -1,18 +1,59 @@
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@powersync/react";
 import { useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SettingRow } from "@/components/settings/setting-row";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import { NOTIFICATION_PREFERENCES_QUERY } from "@/db/queries";
+import type { NotificationPreferencesRecord } from "@/db/schema";
+
+function formatThresholdSummary(seconds: number | null): string {
+  if (seconds === null) return "Auto";
+  const minutes = Math.round(seconds / 60);
+  if (minutes % 60 === 0) return `${minutes / 60}h`;
+  return `${minutes}m`;
+}
+
+function buildNotificationSummary(
+  prefs: NotificationPreferencesRecord | null,
+): string {
+  if (!prefs) return "Loading…";
+  const idle = prefs.idle_reminder_enabled === 1;
+  const longRunning = prefs.long_running_enabled === 1;
+  if (!idle && !longRunning) return "All reminders off";
+  const parts: string[] = [];
+  if (idle) parts.push("Idle");
+  if (longRunning) {
+    const threshold = formatThresholdSummary(
+      prefs.threshold_override_seconds ?? null,
+    );
+    parts.push(`Long-running · ${threshold}`);
+  }
+  return parts.join(" · ");
+}
 
 export default function SettingsScreen(): React.ReactElement {
   const router = useRouter();
+  const { data: prefsData } = useQuery<NotificationPreferencesRecord>(
+    NOTIFICATION_PREFERENCES_QUERY,
+  );
+  const prefs = prefsData.length > 0 ? prefsData[0] : null;
 
   const goToIdealAllocations = useCallback(() => {
     router.push("/ideal-allocations");
   }, [router]);
+
+  const goToNotifications = useCallback(() => {
+    router.push("/notifications-settings");
+  }, [router]);
+
+  const notificationSummary = useMemo(
+    () => buildNotificationSummary(prefs),
+    [prefs],
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -27,6 +68,15 @@ export default function SettingsScreen(): React.ReactElement {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       >
+        <SettingRow
+          title="Notifications"
+          description={notificationSummary}
+          onPress={goToNotifications}
+          iconBackground={COLORS.surfaceContainer}
+          iconChildren={
+            <Feather name="bell" size={20} color={COLORS.primary} />
+          }
+        />
         <SettingRow
           title="Goals"
           description="Ideal hours per day for each category"

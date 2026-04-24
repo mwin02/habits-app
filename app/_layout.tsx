@@ -120,6 +120,14 @@ function RootLayoutNav() {
               headerTitle: "",
             }}
           />
+          <Stack.Screen
+            name="notifications-settings"
+            options={{
+              title: "Notifications",
+              headerBackTitle: "Back",
+              headerTitle: "",
+            }}
+          />
         </Stack>
       </ThemeProvider>
     </PowerSyncContext.Provider>

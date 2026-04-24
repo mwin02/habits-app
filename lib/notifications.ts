@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import { Linking, Platform } from "react-native";
 
 import { formatDuration } from "./timezone";
 
@@ -128,6 +129,19 @@ export async function cancelLongRunningReminder(entryId: string): Promise<void> 
 /** Cancel every notification this app has scheduled. */
 export async function cancelAllAppNotifications(): Promise<void> {
   await Notifications.cancelAllScheduledNotificationsAsync();
+}
+
+/**
+ * Deep-link into the OS settings for this app so the user can toggle
+ * notification permission. iOS-only — Android surfaces settings via
+ * `Linking.openSettings()` which behaves similarly.
+ */
+export async function openSystemNotificationSettings(): Promise<void> {
+  if (Platform.OS === "ios") {
+    await Linking.openURL("app-settings:");
+    return;
+  }
+  await Linking.openSettings();
 }
 
 /** All scheduled identifiers currently held by the OS for this app. */
