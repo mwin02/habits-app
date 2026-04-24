@@ -478,6 +478,53 @@ export const INSIGHTS_ACTIVITY_QUERY = `
   ORDER BY total_seconds DESC
 `;
 
+/**
+ * Row shape returned by the top-activities aggregation query.
+ */
+export interface TopActivityRow {
+  activity_id: string;
+  activity_name: string;
+  category_id: string;
+  category_name: string;
+  category_color: string;
+  total_seconds: number;
+}
+
+/**
+ * SQL query to aggregate tracked time per activity across ALL categories.
+ * Clips each entry to the queried range so midnight-spanning entries are
+ * split proportionally between days. Joins activity → category for chip
+ * color/name.
+ * Params: [endOfRangeUTC, startOfRangeUTC, endOfRangeUTC, startOfRangeUTC]
+ */
+export const TOP_ACTIVITIES_QUERY = `
+  SELECT
+    a.id              AS activity_id,
+    a.name            AS activity_name,
+    c.id              AS category_id,
+    c.name            AS category_name,
+    c.color           AS category_color,
+    COALESCE(SUM(
+      MAX(0, CAST(
+        (MIN(julianday(?), julianday(COALESCE(te.ended_at, 'now')))
+         - MAX(julianday(?), julianday(te.started_at))) * 86400 AS INTEGER
+      ))
+    ), 0) AS total_seconds
+  FROM activities a
+  JOIN categories c ON c.id = a.category_id
+  LEFT JOIN time_entries te ON te.activity_id = a.id
+    AND te.deleted_at IS NULL
+    AND te.started_at <= ?
+    AND (te.ended_at IS NULL OR te.ended_at >= ?)
+  WHERE a.is_archived = 0
+    AND a.deleted_at IS NULL
+    AND c.is_archived = 0
+    AND c.deleted_at IS NULL
+  GROUP BY a.id
+  HAVING total_seconds > 0
+  ORDER BY total_seconds DESC
+`;
+
 // ──────────────────────────────────────────────
 // Ideal Allocations
 // ──────────────────────────────────────────────

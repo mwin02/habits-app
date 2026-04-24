@@ -2,6 +2,7 @@ import { ActivityBreakdown } from "@/components/insights/activity-breakdown";
 import { ActualVsIdeal } from "@/components/insights/actual-vs-ideal";
 import { CalendarHeatmap } from "@/components/insights/calendar-heatmap";
 import { CategoryBreakdown } from "@/components/insights/category-breakdown";
+import { TopActivitiesRanked } from "@/components/insights/top-activities-ranked";
 import { TrackingCoverage } from "@/components/insights/tracking-coverage";
 import { SPACING } from "@/constants/theme";
 import type { CategoryInsight, DayCoverage } from "@/db/models";
@@ -43,6 +44,8 @@ export function MonthlyInsightsView({
         selectedDate={selectedDate}
         period="monthly"
       />
+
+      <TopActivitiesRanked monthDate={selectedDate} />
 
       <TrackingCoverage coverage={coverage} period="monthly" />
     </ScrollView>
