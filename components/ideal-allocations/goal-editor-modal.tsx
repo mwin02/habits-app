@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CategoryIcon } from "@/components/common/category-icon";
 import { GradientButton } from "@/components/common/gradient-button";
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
-import type { CategoryWithActivities } from "@/db/models";
+import type { CategoryWithActivities, GoalDirection } from "@/db/models";
 import {
   clearAllIdealAllocationsForCategory,
   setIdealAllocation,
@@ -25,6 +25,16 @@ import {
 import { useIdealAllocationsForCategory } from "@/hooks/useIdealAllocationsForCategory";
 
 type Mode = "uniform" | "perDay";
+
+const DIRECTION_OPTIONS: {
+  value: GoalDirection;
+  label: string;
+  helper: string;
+}[] = [
+  { value: "at_least", label: "At least", helper: "Floor — more is fine." },
+  { value: "around", label: "Around", helper: "Hit the target either way." },
+  { value: "at_most", label: "At most", helper: "Cap — less is fine." },
+];
 
 interface GoalEditorModalProps {
   visible: boolean;
@@ -40,10 +50,15 @@ export function GoalEditorModal({
   onClose,
 }: GoalEditorModalProps): React.ReactElement {
   const insets = useSafeAreaInsets();
-  const { defaultMinutes, perDayMinutes, isLoading } =
-    useIdealAllocationsForCategory(category?.id ?? null);
+  const {
+    defaultMinutes,
+    perDayMinutes,
+    goalDirection: savedDirection,
+    isLoading,
+  } = useIdealAllocationsForCategory(category?.id ?? null);
 
   const [mode, setMode] = useState<Mode>("uniform");
+  const [direction, setDirection] = useState<GoalDirection>("around");
   const [uniform, setUniform] = useState<HM>({ h: "0", m: "0" });
   const [perDay, setPerDay] = useState<HM[]>(() => emptyPerDay());
   const [submitting, setSubmitting] = useState(false);
@@ -55,6 +70,7 @@ export function GoalEditorModal({
     const hasOverrides = perDayMinutes.some((v) => v != null);
     const nextMode: Mode = hasOverrides ? "perDay" : "uniform";
     setMode(nextMode);
+    setDirection(savedDirection ?? "around");
     setUniform(minutesToHM(defaultMinutes ?? 0));
     setPerDay(
       perDayMinutes.map((v) =>
@@ -62,7 +78,7 @@ export function GoalEditorModal({
       ),
     );
     setSubmitting(false);
-  }, [visible, category, defaultMinutes, perDayMinutes]);
+  }, [visible, category, defaultMinutes, perDayMinutes, savedDirection]);
 
   const handleClose = useCallback(() => {
     if (submitting) return;
@@ -107,6 +123,7 @@ export function GoalEditorModal({
           categoryId: category.id,
           dayOfWeek: null,
           targetMinutesPerDay: hmToMinutes(uniform),
+          goalDirection: direction,
         });
       } else {
         // Write 7 rows, one per weekday. Absent/0 days still get a row so
@@ -116,6 +133,7 @@ export function GoalEditorModal({
             categoryId: category.id,
             dayOfWeek: wd,
             targetMinutesPerDay: hmToMinutes(perDay[wd]),
+            goalDirection: direction,
           });
         }
       }
@@ -124,7 +142,7 @@ export function GoalEditorModal({
       console.error("Failed to save goal", err);
       setSubmitting(false);
     }
-  }, [category, mode, uniform, perDay, onClose]);
+  }, [category, mode, direction, uniform, perDay, onClose]);
 
   const totalWeekMinutes = useMemo(() => {
     if (mode === "uniform") return hmToMinutes(uniform) * 7;
@@ -195,6 +213,22 @@ export function GoalEditorModal({
               onPress={() => setMode("perDay")}
             />
           </View>
+
+          {/* Direction selector */}
+          <Text style={styles.sectionLabel}>GOAL TYPE</Text>
+          <View style={styles.directionRow}>
+            {DIRECTION_OPTIONS.map((opt) => (
+              <DirectionButton
+                key={opt.value}
+                label={opt.label}
+                active={direction === opt.value}
+                onPress={() => setDirection(opt.value)}
+              />
+            ))}
+          </View>
+          <Text style={styles.directionHelper}>
+            {DIRECTION_OPTIONS.find((o) => o.value === direction)?.helper}
+          </Text>
 
           <ScrollView
             keyboardShouldPersistTaps="handled"
@@ -270,6 +304,37 @@ function ModeButton({ label, active, onPress }: ModeButtonProps): React.ReactEle
       onPress={onPress}
     >
       <Text style={[styles.modeButtonText, active && styles.modeButtonTextActive]}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+interface DirectionButtonProps {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}
+
+function DirectionButton({
+  label,
+  active,
+  onPress,
+}: DirectionButtonProps): React.ReactElement {
+  return (
+    <Pressable
+      style={[
+        styles.directionButton,
+        active && styles.directionButtonActive,
+      ]}
+      onPress={onPress}
+    >
+      <Text
+        style={[
+          styles.directionButtonText,
+          active && styles.directionButtonTextActive,
+        ]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -440,6 +505,42 @@ const styles = StyleSheet.create({
   modeButtonTextActive: {
     color: COLORS.onSurface,
     fontWeight: "600",
+  },
+  sectionLabel: {
+    ...TYPOGRAPHY.labelUppercase,
+    color: COLORS.onSurfaceVariant,
+    marginBottom: SPACING.sm,
+  },
+  directionRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+    padding: 4,
+    borderRadius: RADIUS.xl,
+    backgroundColor: COLORS.surfaceContainerLow,
+    marginBottom: SPACING.xs,
+  },
+  directionButton: {
+    flex: 1,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    alignItems: "center",
+  },
+  directionButtonActive: {
+    backgroundColor: COLORS.surfaceContainerLowest,
+  },
+  directionButtonText: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.onSurfaceVariant,
+  },
+  directionButtonTextActive: {
+    color: COLORS.onSurface,
+    fontWeight: "600",
+  },
+  directionHelper: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.onSurfaceVariant,
+    marginBottom: SPACING.lg,
   },
   scroll: {
     flexGrow: 0,

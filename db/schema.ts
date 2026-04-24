@@ -73,6 +73,8 @@ const ideal_allocations = new Table(
     // 0=Mon … 6=Sun. NULL = applies to every day (default).
     day_of_week: column.integer,
     target_minutes_per_day: column.integer,
+    // 'at_least' | 'at_most' | 'around'. NULL = 'around' (legacy rows).
+    goal_direction: column.text,
     created_at: column.text,
     updated_at: column.text,
     deleted_at: column.text,

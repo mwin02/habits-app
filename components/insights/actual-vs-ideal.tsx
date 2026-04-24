@@ -109,11 +109,22 @@ function ComparisonRow({ insight }: ComparisonRowProps): React.ReactElement {
     ]).start();
   }, [actualPercent, targetPercent, animatedActual, animatedTarget]);
 
-  // Green when within 10% of target (either direction), red otherwise.
+  // Color depends on the goal's direction.
+  //   at_least → green when actual ≥ target − 10% (floor, overshoot is fine)
+  //   at_most  → green when actual ≤ target + 10% (cap, undershoot is fine)
+  //   around   → green when |actual − target| ≤ 10% of target (symmetric)
   // Target of 0 only counts as on-goal when actual is also exactly 0.
   const tolerance = target > 0 ? target * 0.1 : 0;
-  const withinTolerance = Math.abs(diff) <= tolerance;
-  const diffColor = withinTolerance ? COLORS.secondary : COLORS.error;
+  const direction = insight.goalDirection ?? "around";
+  let onGoal: boolean;
+  if (direction === "at_least") {
+    onGoal = actual >= target - tolerance;
+  } else if (direction === "at_most") {
+    onGoal = actual <= target + tolerance;
+  } else {
+    onGoal = Math.abs(diff) <= tolerance;
+  }
+  const diffColor = onGoal ? COLORS.secondary : COLORS.error;
   const diffPrefix = diff > 0 ? "+" : "-";
 
   return (

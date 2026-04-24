@@ -74,6 +74,14 @@ export interface TimelineGap {
   durationSeconds: number;
 }
 
+/**
+ * How actual time relates to the ideal target.
+ *  - 'at_least'  → user wants actual ≥ target (e.g. work, exercise)
+ *  - 'at_most'   → user wants actual ≤ target (e.g. entertainment, doomscrolling)
+ *  - 'around'    → user wants actual ≈ target (symmetric tolerance)
+ */
+export type GoalDirection = 'at_least' | 'at_most' | 'around';
+
 /** Insight data for a single category */
 export interface CategoryInsight {
   categoryId: string;
@@ -82,6 +90,8 @@ export interface CategoryInsight {
   actualMinutes: number;
   targetMinutes: number | null;
   differenceMinutes: number | null;
+  /** null when the category has no goal. */
+  goalDirection: GoalDirection | null;
 }
 
 /** Daily coverage stats */

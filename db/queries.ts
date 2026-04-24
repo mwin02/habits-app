@@ -6,7 +6,7 @@ import type {
   TimeEntryRecord,
   IdealAllocationRecord,
 } from './schema';
-import type { TimeEntrySource } from './models';
+import type { GoalDirection, TimeEntrySource } from './models';
 
 // ──────────────────────────────────────────────
 // Helpers
@@ -430,13 +430,15 @@ export interface IdealAllocationRow {
   category_id: string;
   day_of_week: number | null;
   target_minutes_per_day: number;
+  /** NULL in the DB for legacy rows — callers should treat it as 'around'. */
+  goal_direction: GoalDirection | null;
 }
 
 /**
  * SQL query for reactive ideal allocations (for useQuery).
  */
 export const IDEAL_ALLOCATIONS_QUERY = `
-  SELECT id, category_id, day_of_week, target_minutes_per_day
+  SELECT id, category_id, day_of_week, target_minutes_per_day, goal_direction
   FROM ideal_allocations
   WHERE deleted_at IS NULL
 `;
@@ -551,11 +553,13 @@ export async function getIdealAllocationsForCategory(
 /**
  * Upsert ideal allocation for (category, day_of_week).
  * `dayOfWeek`: 0=Mon … 6=Sun, or null for "every day".
+ * `goalDirection`: 'at_least' | 'at_most' | 'around'.
  */
 export async function setIdealAllocation(params: {
   categoryId: string;
   dayOfWeek: number | null;
   targetMinutesPerDay: number;
+  goalDirection: GoalDirection;
 }): Promise<void> {
   const now = nowUTC();
   // SQLite: `day_of_week IS ?` treats NULL correctly when parameter is null.
@@ -567,19 +571,23 @@ export async function setIdealAllocation(params: {
 
   if (existing) {
     await db.execute(
-      'UPDATE ideal_allocations SET target_minutes_per_day = ?, updated_at = ? WHERE id = ?',
-      [params.targetMinutesPerDay, now, existing.id]
+      `UPDATE ideal_allocations
+       SET target_minutes_per_day = ?, goal_direction = ?, updated_at = ?
+       WHERE id = ?`,
+      [params.targetMinutesPerDay, params.goalDirection, now, existing.id]
     );
   } else {
     const id = generateId();
     await db.execute(
-      `INSERT INTO ideal_allocations (id, user_id, category_id, day_of_week, target_minutes_per_day, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, ?, ?, ?)`,
+      `INSERT INTO ideal_allocations
+         (id, user_id, category_id, day_of_week, target_minutes_per_day, goal_direction, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         params.categoryId,
         params.dayOfWeek,
         params.targetMinutesPerDay,
+        params.goalDirection,
         now,
         now,
       ]

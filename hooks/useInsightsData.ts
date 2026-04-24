@@ -1,4 +1,4 @@
-import type { CategoryInsight, DayCoverage } from "@/db/models";
+import type { CategoryInsight, DayCoverage, GoalDirection } from "@/db/models";
 import {
   IDEAL_ALLOCATIONS_QUERY,
   INSIGHTS_CATEGORY_QUERY,
@@ -184,19 +184,31 @@ export function useInsightsData(
   // Combine into CategoryInsight[] and DayCoverage
   const result = useMemo(() => {
     // Build per-category lookup keyed by day_of_week (0-6) with a `null` slot
-    // for the "every day" default.
-    type Targets = { default: number | null; perDay: (number | null)[] };
+    // for the "every day" default. Track each row's direction so we can
+    // surface it on the CategoryInsight.
+    type Targets = {
+      default: number | null;
+      perDay: (number | null)[];
+      directions: GoalDirection[]; // all non-null directions seen for the category
+    };
     const byCategory = new Map<string, Targets>();
     for (const row of allocationRows) {
       let entry = byCategory.get(row.category_id);
       if (!entry) {
-        entry = { default: null, perDay: [null, null, null, null, null, null, null] };
+        entry = {
+          default: null,
+          perDay: [null, null, null, null, null, null, null],
+          directions: [],
+        };
         byCategory.set(row.category_id, entry);
       }
       if (row.day_of_week == null) {
         entry.default = row.target_minutes_per_day;
       } else if (row.day_of_week >= 0 && row.day_of_week <= 6) {
         entry.perDay[row.day_of_week] = row.target_minutes_per_day;
+      }
+      if (row.goal_direction != null) {
+        entry.directions.push(row.goal_direction);
       }
     }
 
@@ -220,6 +232,16 @@ export function useInsightsData(
       return total;
     };
 
+    /** Pick a single direction for the category. The editor keeps all rows
+     *  in sync, so in practice the set is {0,1}. Fall back to 'around'. */
+    const resolveDirection = (categoryId: string): GoalDirection | null => {
+      const entry = byCategory.get(categoryId);
+      if (!entry || entry.directions.length === 0) return null;
+      const first = entry.directions[0];
+      const allSame = entry.directions.every((d) => d === first);
+      return allSame ? first : "around";
+    };
+
     let totalTrackedMinutes = 0;
 
     const categoryInsights: CategoryInsight[] = categoryRows.map((row) => {
@@ -229,6 +251,10 @@ export function useInsightsData(
       const targetMinutes = computeTarget(row.category_id);
       const differenceMinutes =
         targetMinutes != null ? actualMinutes - targetMinutes : null;
+      const goalDirection =
+        targetMinutes != null
+          ? resolveDirection(row.category_id) ?? "around"
+          : null;
 
       return {
         categoryId: row.category_id,
@@ -237,6 +263,7 @@ export function useInsightsData(
         actualMinutes,
         targetMinutes,
         differenceMinutes,
+        goalDirection,
       };
     });
 

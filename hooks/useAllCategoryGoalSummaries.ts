@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@powersync/react";
 
+import type { GoalDirection } from "@/db/models";
 import {
   IDEAL_ALLOCATIONS_QUERY,
   type IdealAllocationRow,
@@ -36,6 +37,7 @@ export function useAllCategoryGoalSummaries(): UseAllCategoryGoalSummariesResult
     type Entry = {
       defaultVal: number | null;
       perDay: (number | null)[];
+      directions: GoalDirection[];
     };
     const byCategory = new Map<string, Entry>();
     for (const row of rows) {
@@ -44,6 +46,7 @@ export function useAllCategoryGoalSummaries(): UseAllCategoryGoalSummariesResult
         entry = {
           defaultVal: null,
           perDay: [null, null, null, null, null, null, null],
+          directions: [],
         };
         byCategory.set(row.category_id, entry);
       }
@@ -52,11 +55,16 @@ export function useAllCategoryGoalSummaries(): UseAllCategoryGoalSummariesResult
       } else if (row.day_of_week >= 0 && row.day_of_week <= 6) {
         entry.perDay[row.day_of_week] = row.target_minutes_per_day;
       }
+      if (row.goal_direction != null) entry.directions.push(row.goal_direction);
     }
 
     const result = new Map<string, CategoryGoalSummary>();
     for (const [categoryId, entry] of byCategory) {
-      result.set(categoryId, summarise(entry.defaultVal, entry.perDay));
+      const direction = resolveDirection(entry.directions);
+      result.set(
+        categoryId,
+        summarise(entry.defaultVal, entry.perDay, direction),
+      );
     }
     return result;
   }, [rows]);
@@ -66,9 +74,22 @@ export function useAllCategoryGoalSummaries(): UseAllCategoryGoalSummariesResult
 
 // ──────────────────────────────────────────────
 
+function resolveDirection(directions: GoalDirection[]): GoalDirection {
+  if (directions.length === 0) return "around";
+  const first = directions[0];
+  return directions.every((d) => d === first) ? first : "around";
+}
+
+function directionPrefix(d: GoalDirection): string {
+  if (d === "at_least") return "At least ";
+  if (d === "at_most") return "At most ";
+  return "";
+}
+
 function summarise(
   defaultVal: number | null,
   perDay: (number | null)[],
+  direction: GoalDirection,
 ): CategoryGoalSummary {
   // Effective minutes for each weekday (0=Mon … 6=Sun), or null if unset.
   const effective = perDay.map((v) => (v != null ? v : defaultVal));
@@ -77,6 +98,7 @@ function summarise(
   if (!anySet) return NOT_SET;
 
   const allDefined = effective.every((v) => v != null);
+  const prefix = directionPrefix(direction);
 
   if (allDefined) {
     const first = effective[0]!;
@@ -84,7 +106,8 @@ function summarise(
     if (allSame) {
       return {
         hasGoal: true,
-        label: first === 0 ? "Off daily" : `${fmt(first)} daily`,
+        label:
+          first === 0 ? "Off daily" : `${prefix}${fmt(first)} daily`,
       };
     }
 
@@ -95,16 +118,18 @@ function summarise(
     if (weekdaysSame && weekendsSame) {
       const wd = weekdayVals[0];
       const we = weekendVals[0];
-      if (wd > 0 && we === 0) return { hasGoal: true, label: `${fmt(wd)} weekdays` };
-      if (wd === 0 && we > 0) return { hasGoal: true, label: `${fmt(we)} weekends` };
+      if (wd > 0 && we === 0)
+        return { hasGoal: true, label: `${prefix}${fmt(wd)} weekdays` };
+      if (wd === 0 && we > 0)
+        return { hasGoal: true, label: `${prefix}${fmt(we)} weekends` };
       return {
         hasGoal: true,
-        label: `${fmt(wd)} weekdays · ${fmt(we)} weekends`,
+        label: `${prefix}${fmt(wd)} weekdays · ${fmt(we)} weekends`,
       };
     }
   }
 
-  return { hasGoal: true, label: "Custom schedule" };
+  return { hasGoal: true, label: `${prefix}Custom schedule` };
 }
 
 function fmt(minutes: number): string {
