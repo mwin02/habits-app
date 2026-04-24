@@ -70,12 +70,20 @@ const ideal_allocations = new Table(
   {
     user_id: column.text,
     category_id: column.text,
+    // 0=Mon … 6=Sun. NULL = applies to every day (default).
+    day_of_week: column.integer,
     target_minutes_per_day: column.integer,
     created_at: column.text,
     updated_at: column.text,
     deleted_at: column.text,
   },
-  { localOnly: true, indexes: { by_category: ['category_id'] } }
+  {
+    localOnly: true,
+    indexes: {
+      by_category: ['category_id'],
+      by_category_day: ['category_id', 'day_of_week'],
+    },
+  }
 );
 
 const daily_summaries = new Table(
