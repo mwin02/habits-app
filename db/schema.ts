@@ -88,6 +88,20 @@ const ideal_allocations = new Table(
   }
 );
 
+const notification_preferences = new Table(
+  {
+    user_id: column.text,
+    idle_reminder_enabled: column.integer,       // 0 or 1
+    long_running_enabled: column.integer,        // 0 or 1
+    threshold_override_seconds: column.integer,  // null = compute from median
+    has_asked_permission: column.integer,        // 0 or 1
+    created_at: column.text,
+    updated_at: column.text,
+    deleted_at: column.text,
+  },
+  { localOnly: true }
+);
+
 const daily_summaries = new Table(
   {
     user_id: column.text,
@@ -105,6 +119,7 @@ export const AppSchema = new Schema({
   activities,
   time_entries,
   ideal_allocations,
+  notification_preferences,
   daily_summaries,
 });
 
@@ -113,4 +128,5 @@ export type CategoryRecord = Database['categories'];
 export type ActivityRecord = Database['activities'];
 export type TimeEntryRecord = Database['time_entries'];
 export type IdealAllocationRecord = Database['ideal_allocations'];
+export type NotificationPreferencesRecord = Database['notification_preferences'];
 export type DailySummaryRecord = Database['daily_summaries'];

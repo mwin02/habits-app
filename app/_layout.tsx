@@ -24,7 +24,7 @@ import { useEffect, useState } from "react";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/components/useColorScheme";
-import { seedPresetsIfNeeded } from "@/db/seed";
+import { seedNotificationPreferencesIfNeeded, seedPresetsIfNeeded } from "@/db/seed";
 import { db } from "@/lib/powersync";
 
 export {
@@ -68,6 +68,7 @@ export default function RootLayout() {
         await db.init();
         console.log("[Habits] DB init complete, seeding...");
         await seedPresetsIfNeeded();
+        await seedNotificationPreferencesIfNeeded();
         console.log("[Habits] Seed complete");
       } catch (e) {
         console.error("[Habits] DB init failed:", e);

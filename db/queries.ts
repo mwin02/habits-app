@@ -5,6 +5,7 @@ import type {
   ActivityRecord,
   TimeEntryRecord,
   IdealAllocationRecord,
+  NotificationPreferencesRecord,
 } from './schema';
 import type { GoalDirection, TimeEntrySource } from './models';
 
@@ -625,4 +626,123 @@ export async function clearAllIdealAllocationsForCategory(
      WHERE category_id = ? AND deleted_at IS NULL`,
     [now, now, categoryId]
   );
+}
+
+// ──────────────────────────────────────────────
+// Notification Preferences
+// ──────────────────────────────────────────────
+
+/** Minimum long-running threshold in seconds (45 minutes). */
+export const LONG_RUNNING_MIN_THRESHOLD_SECONDS = 45 * 60;
+
+/** Idle reminder delay in seconds (30 minutes). */
+export const IDLE_REMINDER_DELAY_SECONDS = 30 * 60;
+
+/**
+ * SQL query for the singleton notification preferences row.
+ * Use with useQuery for reactive reads.
+ */
+export const NOTIFICATION_PREFERENCES_QUERY = `
+  SELECT id, user_id, idle_reminder_enabled, long_running_enabled,
+         threshold_override_seconds, has_asked_permission,
+         created_at, updated_at, deleted_at
+  FROM notification_preferences
+  WHERE deleted_at IS NULL
+  ORDER BY created_at ASC
+  LIMIT 1
+`;
+
+/** Fetch the singleton notification preferences row (one-shot). */
+export async function getNotificationPreferences(): Promise<NotificationPreferencesRecord | null> {
+  return db.getOptional<NotificationPreferencesRecord>(NOTIFICATION_PREFERENCES_QUERY);
+}
+
+export interface NotificationPreferencesPatch {
+  idle_reminder_enabled?: number;
+  long_running_enabled?: number;
+  threshold_override_seconds?: number | null;
+  has_asked_permission?: number;
+}
+
+/** Partial update of the singleton preferences row. */
+export async function updateNotificationPreferences(
+  patch: NotificationPreferencesPatch
+): Promise<void> {
+  const fields: string[] = [];
+  const values: (string | number | null)[] = [];
+
+  if (patch.idle_reminder_enabled !== undefined) {
+    fields.push('idle_reminder_enabled = ?');
+    values.push(patch.idle_reminder_enabled);
+  }
+  if (patch.long_running_enabled !== undefined) {
+    fields.push('long_running_enabled = ?');
+    values.push(patch.long_running_enabled);
+  }
+  if (patch.threshold_override_seconds !== undefined) {
+    fields.push('threshold_override_seconds = ?');
+    values.push(patch.threshold_override_seconds);
+  }
+  if (patch.has_asked_permission !== undefined) {
+    fields.push('has_asked_permission = ?');
+    values.push(patch.has_asked_permission);
+  }
+
+  if (fields.length === 0) return;
+
+  const now = nowUTC();
+  fields.push('updated_at = ?');
+  values.push(now);
+
+  await db.execute(
+    `UPDATE notification_preferences
+     SET ${fields.join(', ')}
+     WHERE deleted_at IS NULL`,
+    values
+  );
+}
+
+/**
+ * Returns rows of duration_seconds for the given category's completed entries
+ * in the last 30 days, excluding retroactive/import sources and clipping to
+ * [60s, 43200s] to drop accidental taps and forgotten-timer outliers.
+ */
+export const MEDIAN_DURATION_QUERY = `
+  SELECT te.duration_seconds AS duration_seconds
+  FROM time_entries te
+  JOIN activities a ON a.id = te.activity_id
+  WHERE a.category_id = ?
+    AND te.deleted_at IS NULL
+    AND te.ended_at IS NOT NULL
+    AND te.started_at >= ?
+    AND te.source IN ('timer','manual')
+    AND te.duration_seconds BETWEEN 60 AND 43200
+  ORDER BY te.duration_seconds
+`;
+
+function median(sortedValues: number[]): number {
+  const n = sortedValues.length;
+  if (n === 0) return 0;
+  const mid = Math.floor(n / 2);
+  if (n % 2 === 1) return sortedValues[mid];
+  return (sortedValues[mid - 1] + sortedValues[mid]) / 2;
+}
+
+/**
+ * Compute the long-running reminder threshold (seconds) for a category.
+ * threshold = max(1.5 * median(recent durations), 45 min).
+ * Falls back to 45 min floor when there is no recent history.
+ */
+export async function computeCategoryThreshold(
+  categoryId: string
+): Promise<number> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const rows = await db.getAll<{ duration_seconds: number }>(
+    MEDIAN_DURATION_QUERY,
+    [categoryId, thirtyDaysAgo]
+  );
+  if (rows.length === 0) return LONG_RUNNING_MIN_THRESHOLD_SECONDS;
+  const sorted = rows.map((r) => r.duration_seconds);
+  const m = median(sorted);
+  return Math.max(Math.round(1.5 * m), LONG_RUNNING_MIN_THRESHOLD_SECONDS);
 }

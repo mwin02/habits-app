@@ -43,3 +43,27 @@ export async function seedPresetsIfNeeded(): Promise<void> {
 
   console.log(`Seeded ${PRESET_CATEGORIES.length} categories with activities`);
 }
+
+/**
+ * Seed a single notification_preferences row on first launch.
+ * Idempotent — no-op if any non-deleted row already exists.
+ */
+export async function seedNotificationPreferencesIfNeeded(): Promise<void> {
+  const existing = await db.getOptional<{ count: number }>(
+    'SELECT COUNT(*) as count FROM notification_preferences WHERE deleted_at IS NULL'
+  );
+
+  if (existing && existing.count > 0) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  await db.execute(
+    `INSERT INTO notification_preferences
+       (id, user_id, idle_reminder_enabled, long_running_enabled,
+        threshold_override_seconds, has_asked_permission,
+        created_at, updated_at)
+     VALUES (?, NULL, 1, 1, NULL, 0, ?, ?)`,
+    [generateId(), now, now]
+  );
+}
