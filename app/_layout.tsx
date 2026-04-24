@@ -109,6 +109,14 @@ function RootLayoutNav() {
               headerTitle: "",
             }}
           />
+          <Stack.Screen
+            name="ideal-allocations"
+            options={{
+              title: "Ideal Allocations",
+              headerBackTitle: "Back",
+              headerTitle: "",
+            }}
+          />
         </Stack>
       </ThemeProvider>
     </PowerSyncContext.Provider>

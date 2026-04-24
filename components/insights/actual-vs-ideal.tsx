@@ -1,5 +1,7 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { CategoryInsight } from '@/db/models';
 import { formatDuration } from '@/lib/timezone';
 import { COLORS, FONTS, RADIUS, SPACING, TYPOGRAPHY } from '@/constants/theme';
@@ -11,13 +13,36 @@ interface ActualVsIdealProps {
 export function ActualVsIdeal({
   categoryInsights,
 }: ActualVsIdealProps): React.ReactElement {
+  const router = useRouter();
   // Only show categories that have an ideal allocation set
   const withTargets = categoryInsights.filter((c) => c.targetMinutes != null);
+
+  const openSettings = useCallback(() => {
+    router.push('/ideal-allocations');
+  }, [router]);
+
+  const Header = (
+    <View style={styles.headerRow}>
+      <Text style={styles.sectionLabel}>ACTUAL VS IDEAL</Text>
+      <Pressable
+        onPress={openSettings}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Set ideal allocations"
+        style={({ pressed }) => [
+          styles.gearButton,
+          pressed && styles.gearButtonPressed,
+        ]}
+      >
+        <Feather name="settings" size={16} color={COLORS.onSurfaceVariant} />
+      </Pressable>
+    </View>
+  );
 
   if (withTargets.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionLabel}>ACTUAL VS IDEAL</Text>
+        {Header}
         <Text style={styles.emptyText}>
           Set daily goals for your categories to see how you compare.
         </Text>
@@ -27,7 +52,7 @@ export function ActualVsIdeal({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>ACTUAL VS IDEAL</Text>
+      {Header}
 
       {/* Legend */}
       <View style={styles.legendRow}>
@@ -158,7 +183,22 @@ const styles = StyleSheet.create({
   sectionLabel: {
     ...TYPOGRAPHY.labelUppercase,
     color: COLORS.onSurfaceVariant,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: SPACING.md,
+  },
+  gearButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gearButtonPressed: {
+    backgroundColor: COLORS.surfaceContainer,
   },
   emptyText: {
     ...TYPOGRAPHY.body,
