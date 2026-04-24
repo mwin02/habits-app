@@ -3,6 +3,7 @@ import { ActualVsIdeal } from "@/components/insights/actual-vs-ideal";
 import { CategoryBreakdown } from "@/components/insights/category-breakdown";
 import { DayOfWeekBars } from "@/components/insights/day-of-week-bars";
 import { TrackingCoverage } from "@/components/insights/tracking-coverage";
+import { WeekOverWeekDelta } from "@/components/insights/week-over-week-delta";
 import { SPACING } from "@/constants/theme";
 import type { CategoryInsight, DayCoverage } from "@/db/models";
 import React from "react";
@@ -28,6 +29,8 @@ export function WeeklyInsightsView({
       showsVerticalScrollIndicator={false}
     >
       <DayOfWeekBars weekDate={selectedDate} />
+
+      <WeekOverWeekDelta weekDate={selectedDate} />
 
       <CategoryBreakdown
         categoryInsights={categoryInsights}
