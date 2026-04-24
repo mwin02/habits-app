@@ -74,6 +74,8 @@ export function useNotificationScheduler(): void {
   const thresholdOverride = prefs?.threshold_override_seconds ?? null;
 
   const prevEntryIdRef = useRef<string | null | undefined>(undefined);
+  const prevIdleEnabledRef = useRef<boolean | undefined>(undefined);
+  const prevLongRunningEnabledRef = useRef<boolean | undefined>(undefined);
   const permissionAskedRef = useRef(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
@@ -154,6 +156,45 @@ export function useNotificationScheduler(): void {
     thresholdOverride,
     running,
   ]);
+
+  // React to toggle flips that don't coincide with a running-entry transition.
+  // e.g. flipping "Still there?" on while stopped should start the 30-min idle
+  // timer immediately; flipping it off should cancel any pending reminder.
+  useEffect(() => {
+    if (!prefs) return;
+    const prevIdle = prevIdleEnabledRef.current;
+    const prevLongRunning = prevLongRunningEnabledRef.current;
+    prevIdleEnabledRef.current = idleEnabled;
+    prevLongRunningEnabledRef.current = longRunningEnabled;
+    if (prevIdle === undefined || prevLongRunning === undefined) return;
+
+    const idleChanged = prevIdle !== idleEnabled;
+    const longRunningChanged = prevLongRunning !== longRunningEnabled;
+    if (!idleChanged && !longRunningChanged) return;
+
+    void (async () => {
+      const granted = await hasNotificationPermission();
+      if (!granted) return;
+
+      if (idleChanged) {
+        if (idleEnabled && running === null) {
+          await scheduleIdleReminder(
+            new Date(Date.now() + IDLE_REMINDER_DELAY_SECONDS * 1000),
+          );
+        } else if (!idleEnabled) {
+          await cancelIdleReminder();
+        }
+      }
+
+      if (longRunningChanged && running !== null) {
+        if (longRunningEnabled) {
+          await scheduleLongRunningForEntry(running);
+        } else {
+          await cancelLongRunningReminder(running.entry_id);
+        }
+      }
+    })();
+  }, [idleEnabled, longRunningEnabled, prefs, running]);
 
   // Foreground reconciliation: drop orphaned schedules and recheck permission.
   useEffect(() => {
