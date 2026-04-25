@@ -1,15 +1,15 @@
-import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/constants/theme';
-import { getCurrentTimezone, getTodayDate } from '@/lib/timezone';
+import { COLORS, RADIUS, SPACING } from "@/constants/theme";
+import { getCurrentTimezone, getTodayDate } from "@/lib/timezone";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useMemo } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface WeekStripProps {
   selectedDate: string; // YYYY-MM-DD
   onDateChange: (date: string) => void;
 }
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface DayInfo {
   dateStr: string; // YYYY-MM-DD
@@ -22,7 +22,7 @@ interface DayInfo {
 
 /** Get Monday of the week containing the given date */
 function getMondayOfWeek(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
+  const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(year, month - 1, day, 12);
   const dow = date.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
   const mondayOffset = dow === 0 ? -6 : 1 - dow;
@@ -32,10 +32,13 @@ function getMondayOfWeek(dateStr: string): Date {
 
 /** Format a Date as YYYY-MM-DD */
 function toDateStr(date: Date): string {
-  return date.toLocaleDateString('en-CA'); // en-CA → YYYY-MM-DD
+  return date.toLocaleDateString("en-CA"); // en-CA → YYYY-MM-DD
 }
 
-export function WeekStrip({ selectedDate, onDateChange }: WeekStripProps): React.ReactElement {
+export function WeekStrip({
+  selectedDate,
+  onDateChange,
+}: WeekStripProps): React.ReactElement {
   const timezone = getCurrentTimezone();
   const today = getTodayDate(timezone);
 
@@ -112,21 +115,20 @@ const CELL_SIZE = 44;
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING['2xl'],
   },
   dayCell: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: SPACING.sm,
   },
   dayLabel: {
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontFamily: "PlusJakartaSans_700Bold",
     fontSize: 10,
-    textTransform: 'uppercase',
-    color: COLORS.onSurfaceVariant + '99', // 60% opacity
+    textTransform: "uppercase",
+    color: COLORS.onSurfaceVariant + "99", // 60% opacity
     letterSpacing: 1,
   },
   dayLabelSelected: {
@@ -139,8 +141,8 @@ const styles = StyleSheet.create({
     width: CELL_SIZE + 4,
     height: CELL_SIZE + 4,
     borderRadius: (CELL_SIZE + 4) / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -148,16 +150,16 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   dayNumberSelected: {
-    fontFamily: 'Manrope_700Bold',
+    fontFamily: "Manrope_700Bold",
     fontSize: 16,
-    color: '#ffffff',
+    color: "#ffffff",
   },
   dayNumberContainer: {
     width: CELL_SIZE,
     height: CELL_SIZE,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   todayRing: {
     borderWidth: 2,
@@ -165,7 +167,7 @@ const styles = StyleSheet.create({
     borderRadius: CELL_SIZE / 2,
   },
   dayNumber: {
-    fontFamily: 'Manrope_700Bold',
+    fontFamily: "Manrope_700Bold",
     fontSize: 16,
     color: COLORS.onSurface,
   },

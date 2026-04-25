@@ -3,6 +3,21 @@ import { generateId } from '@/lib/uuid';
 import type { TagRecord } from '../schema';
 import { nowUTC } from './_helpers';
 
+/**
+ * Reactive query: every (entry_id, tag_id) pair for time entries that
+ * overlap a UTC date range. Used by useTimelineData to dim entries that
+ * don't match the selected tag filter.
+ * Params: [endOfRangeUTC, startOfRangeUTC]
+ */
+export const ENTRY_TAGS_BY_RANGE_QUERY = `
+  SELECT et.entry_id AS entry_id, et.tag_id AS tag_id
+  FROM entry_tags et
+  JOIN time_entries te ON te.id = et.entry_id
+  WHERE te.deleted_at IS NULL
+    AND te.started_at <= ?
+    AND (te.ended_at IS NULL OR te.ended_at >= ?)
+`;
+
 /** Reactive query for all active tags. Use with `useQuery`. */
 export const TAGS_QUERY = `
   SELECT id, user_id, name, color, sort_order, is_archived,

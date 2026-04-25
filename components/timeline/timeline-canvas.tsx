@@ -391,7 +391,11 @@ export function TimelineCanvas({
           return (
             <View
               key={e.id}
-              style={[styles.blockWrapper, { top, height, zIndex }, entryStyle]}
+              style={[
+                styles.blockWrapper,
+                { top, height, zIndex, opacity: e.dimmed ? 0.25 : 1 },
+                entryStyle,
+              ]}
             >
               <TimelineBlock
                 activityName={e.activityName}
@@ -427,6 +431,7 @@ export function TimelineCanvas({
                   top,
                   minHeight: height,
                   zIndex: isExpanded ? 20 : 5,
+                  opacity: c.dimmed ? 0.25 : 1,
                 },
                 clusterPosStyle,
               ]}

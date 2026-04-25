@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { TagFilterRow } from '@/components/common/tag-filter-row';
 import { DateHeader } from '@/components/timeline/date-header';
 import { EntryDetailModal } from '@/components/timeline/entry-detail-modal';
 import { GapFillModal } from '@/components/timeline/gap-fill-modal';
@@ -14,8 +15,9 @@ import { COLORS, SPACING } from '@/constants/theme';
 export default function TimelineScreen(): React.ReactElement {
   const selectedDate = useUIStore((s) => s.selectedDate);
   const setSelectedDate = useUIStore((s) => s.setSelectedDate);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const { items, isLoading, rangeStartMinutes, rangeEndMinutes, timezone } =
-    useTimelineData(selectedDate);
+    useTimelineData(selectedDate, selectedTagIds);
 
   // Modal state
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -56,6 +58,10 @@ export default function TimelineScreen(): React.ReactElement {
     <SafeAreaView style={styles.container} edges={['top']}>
       <DateHeader selectedDate={selectedDate} onDateChange={setSelectedDate} />
       <WeekStrip selectedDate={selectedDate} onDateChange={setSelectedDate} />
+      <TagFilterRow
+        selectedTagIds={selectedTagIds}
+        onChange={setSelectedTagIds}
+      />
 
       {isLoading ? (
         <ActivityIndicator style={styles.loader} color={COLORS.primary} />

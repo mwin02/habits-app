@@ -1,5 +1,9 @@
 import type { TimeEntrySource, TimelineEntry, TimelineGap } from "@/db/models";
-import { TIMELINE_ENTRIES_QUERY, type TimelineEntryRow } from "@/db/queries";
+import {
+  ENTRY_TAGS_BY_RANGE_QUERY,
+  TIMELINE_ENTRIES_QUERY,
+  type TimelineEntryRow,
+} from "@/db/queries";
 import {
   getCurrentTimezone,
   getEndOfDay,
@@ -17,6 +21,8 @@ import { useEffect, useMemo, useState } from "react";
 export type TimelineEntryData = TimelineEntry & {
   activityId: string;
   categoryIcon: string | null;
+  /** True when a tag filter is active and this entry doesn't match. */
+  dimmed?: boolean;
 };
 
 /** A cluster of consecutive short entries */
@@ -25,6 +31,8 @@ export interface TimelineCluster {
   startedAt: Date;
   endedAt: Date;
   totalDurationSeconds: number;
+  /** True when every entry in the cluster is dimmed by the active tag filter. */
+  dimmed?: boolean;
 }
 
 export type TimelineItem =
@@ -145,6 +153,7 @@ function clusterShortEntries(items: TimelineItem[]): TimelineItem[] {
         (sum, e) => sum + (e.durationSeconds ?? 0),
         0,
       );
+      const allDimmed = pendingShort.every((e) => e.dimmed === true);
       result.push({
         type: "cluster",
         data: {
@@ -152,6 +161,7 @@ function clusterShortEntries(items: TimelineItem[]): TimelineItem[] {
           startedAt: first.startedAt,
           endedAt: last.endedAt ?? last.startedAt,
           totalDurationSeconds: totalDuration,
+          dimmed: allDimmed,
         },
       });
     } else {
@@ -200,8 +210,14 @@ function clusterShortEntries(items: TimelineItem[]): TimelineItem[] {
  * and returns a sorted list of TimelineItems with axis range metadata.
  *
  * @param selectedDate — YYYY-MM-DD string (from useUIStore)
+ * @param selectedTagIds — when non-empty, entries without any of these tags
+ *   are flagged `dimmed: true` so the canvas can render them muted (filter
+ *   is OR/union — entries with ANY selected tag stay vivid).
  */
-export function useTimelineData(selectedDate: string): UseTimelineDataResult {
+export function useTimelineData(
+  selectedDate: string,
+  selectedTagIds: string[] = [],
+): UseTimelineDataResult {
   const timezone = getCurrentTimezone();
 
   // Compute true local-midnight boundaries for the selected date so entries
@@ -217,6 +233,37 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
   const { data: rows, isLoading } = useQuery<TimelineEntryRow>(
     TIMELINE_ENTRIES_QUERY,
     [dayEnd.toISOString(), dayStart.toISOString()],
+  );
+
+  // Reactive entry-tag membership for the visible day. Always run the query
+  // (cheap; one row per (entry, tag)) so toggling tags on/off doesn't rebuild
+  // the hook's effect graph.
+  const { data: entryTagRows } = useQuery<{
+    entry_id: string;
+    tag_id: string;
+  }>(ENTRY_TAGS_BY_RANGE_QUERY, [
+    dayEnd.toISOString(),
+    dayStart.toISOString(),
+  ]);
+
+  // Map entry_id → Set<tag_id> for O(1) membership tests below.
+  const tagsByEntry = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const row of entryTagRows) {
+      let set = map.get(row.entry_id);
+      if (!set) {
+        set = new Set();
+        map.set(row.entry_id, set);
+      }
+      set.add(row.tag_id);
+    }
+    return map;
+  }, [entryTagRows]);
+
+  const filterActive = selectedTagIds.length > 0;
+  const selectedTagSet = useMemo(
+    () => new Set(selectedTagIds),
+    [selectedTagIds],
   );
 
   const isToday = selectedDate === getTodayDate(timezone);
@@ -282,6 +329,15 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
       const continuesBefore = startedAt < dayStart;
       const continuesAfter = realOrNow > dayEnd;
 
+      let dimmed = false;
+      if (filterActive) {
+        const entryTagSet = tagsByEntry.get(row.entry_id);
+        const matches = entryTagSet
+          ? [...selectedTagSet].some((id) => entryTagSet.has(id))
+          : false;
+        dimmed = !matches;
+      }
+
       return {
         id: row.entry_id,
         activityId: row.activity_id,
@@ -298,6 +354,7 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
         timezone: row.timezone,
         continuesBefore,
         continuesAfter,
+        dimmed,
         clampedStart,
         clampedEnd,
       };
@@ -397,7 +454,17 @@ export function useTimelineData(selectedDate: string): UseTimelineDataResult {
     const clusteredItems = clusterShortEntries(items);
 
     return { items: clusteredItems, rangeStartMinutes, rangeEndMinutes };
-  }, [rows, dayStart, dayEnd, isToday, now, timezone]);
+  }, [
+    rows,
+    dayStart,
+    dayEnd,
+    isToday,
+    now,
+    timezone,
+    filterActive,
+    selectedTagSet,
+    tagsByEntry,
+  ]);
 
   return {
     items: result.items,
