@@ -50,6 +50,10 @@ export default function SettingsScreen(): React.ReactElement {
     router.push("/notifications-settings");
   }, [router]);
 
+  const goToManageActivities = useCallback(() => {
+    router.push("/manage-activities");
+  }, [router]);
+
   const notificationSummary = useMemo(
     () => buildNotificationSummary(prefs),
     [prefs],
@@ -84,6 +88,15 @@ export default function SettingsScreen(): React.ReactElement {
           iconBackground={COLORS.surfaceContainer}
           iconChildren={
             <Feather name="target" size={20} color={COLORS.primary} />
+          }
+        />
+        <SettingRow
+          title="Manage activities"
+          description="Add, rename, or archive categories and activities"
+          onPress={goToManageActivities}
+          iconBackground={COLORS.surfaceContainer}
+          iconChildren={
+            <Feather name="list" size={20} color={COLORS.primary} />
           }
         />
       </ScrollView>
