@@ -115,6 +115,14 @@ function RootLayoutNav() {
             }}
           />
           <Stack.Screen
+            name="manage-categories"
+            options={{
+              title: "Manage Categories",
+              headerBackTitle: "Back",
+              headerTitle: "",
+            }}
+          />
+          <Stack.Screen
             name="manage-tags"
             options={{
               title: "Manage Tags",

@@ -50,6 +50,10 @@ export default function SettingsScreen(): React.ReactElement {
     router.push("/notifications-settings");
   }, [router]);
 
+  const goToManageCategories = useCallback(() => {
+    router.push("/manage-categories");
+  }, [router]);
+
   const goToManageActivities = useCallback(() => {
     router.push("/manage-activities");
   }, [router]);
@@ -95,8 +99,17 @@ export default function SettingsScreen(): React.ReactElement {
           }
         />
         <SettingRow
+          title="Manage categories"
+          description="Rename, recolor, or change category icons"
+          onPress={goToManageCategories}
+          iconBackground={COLORS.surfaceContainer}
+          iconChildren={
+            <Feather name="grid" size={20} color={COLORS.primary} />
+          }
+        />
+        <SettingRow
           title="Manage activities"
-          description="Add, rename, or archive categories and activities"
+          description="Add, rename, or archive activities"
           onPress={goToManageActivities}
           iconBackground={COLORS.surfaceContainer}
           iconChildren={
