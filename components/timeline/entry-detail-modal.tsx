@@ -1,6 +1,9 @@
 import { CategoryChip } from "@/components/common/category-chip";
+import { TagChip } from "@/components/common/tag-chip";
+import { TagPicker } from "@/components/common/tag-picker";
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
-import { deleteEntry, updateEntryTimes } from "@/db/queries";
+import { deleteEntry, setEntryTags, updateEntryTimes } from "@/db/queries";
+import { useEntryTags } from "@/hooks/useEntryTags";
 import type { TimelineEntryData } from "@/hooks/useTimelineData";
 import { formatDuration, formatTimeInTimezone } from "@/lib/timezone";
 import { Feather } from "@expo/vector-icons";
@@ -34,6 +37,8 @@ export function EntryDetailModal({
   const [editedEnd, setEditedEnd] = useState<Date | null>(null);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [saving, setSaving] = useState(false);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const { tags: entryTags } = useEntryTags(entry?.id ?? null);
 
   // Reset state when entry changes
   useEffect(() => {
@@ -176,6 +181,28 @@ export function EntryDetailModal({
             </View>
           </View>
 
+          {/* Tags row */}
+          <Pressable
+            style={styles.tagsRow}
+            onPress={() => setTagPickerOpen(true)}
+          >
+            <Feather name="tag" size={14} color={COLORS.onSurfaceVariant} />
+            {entryTags.length === 0 ? (
+              <Text style={styles.tagsPlaceholder}>Add tags</Text>
+            ) : (
+              <View style={styles.tagsList}>
+                {entryTags.map((t) => (
+                  <TagChip key={t.id} name={t.name} color={t.color} />
+                ))}
+              </View>
+            )}
+            <Feather
+              name="chevron-right"
+              size={16}
+              color={COLORS.onSurfaceVariant}
+            />
+          </Pressable>
+
           {/* Time rows */}
           <View style={styles.timeSection}>
             {/* Start time row */}
@@ -309,6 +336,17 @@ export function EntryDetailModal({
             )}
           </View>
         </View>
+
+        {entry && (
+          <TagPicker
+            visible={tagPickerOpen}
+            initialSelectedIds={entryTags.map((t) => t.id)}
+            onClose={() => setTagPickerOpen(false)}
+            onConfirm={(ids) => {
+              void setEntryTags(entry.id, ids);
+            }}
+          />
+        )}
       </View>
     </Modal>
   );
@@ -463,5 +501,26 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     ...TYPOGRAPHY.bodySmall,
     color: COLORS.error,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  tagsPlaceholder: {
+    flex: 1,
+    ...TYPOGRAPHY.body,
+    color: COLORS.onSurfaceVariant,
+  },
+  tagsList: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
   },
 });

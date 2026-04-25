@@ -1,7 +1,10 @@
 import { CategoryIcon } from "@/components/common/category-icon";
 import { GradientButton } from "@/components/common/gradient-button";
+import { TagChip } from "@/components/common/tag-chip";
+import { TagPicker } from "@/components/common/tag-picker";
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import type { ActivityItem, CategoryWithActivities } from "@/db/models";
+import { useTags } from "@/hooks/useTags";
 import { Feather } from "@expo/vector-icons";
 import React, { useCallback, useMemo, useState } from "react";
 import {
@@ -21,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 interface NewSessionModalProps {
   visible: boolean;
   onClose: () => void;
-  onStartActivity: (activityId: string) => void;
+  onStartActivity: (activityId: string, tagIds: string[]) => void;
   categories: CategoryWithActivities[];
 }
 
@@ -39,23 +42,33 @@ export function NewSessionModal({
     null,
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const { tags: allTags } = useTags();
+
+  const selectedTags = useMemo(
+    () => allTags.filter((t) => selectedTagIds.includes(t.id)),
+    [allTags, selectedTagIds],
+  );
 
   // Reset state when modal opens/closes
   const handleClose = useCallback((): void => {
     setSelectedCategoryId(null);
     setSelectedActivityId(null);
     setSearchQuery("");
+    setSelectedTagIds([]);
     onClose();
   }, [onClose]);
 
   const handleStart = useCallback((): void => {
     if (selectedActivityId) {
-      onStartActivity(selectedActivityId);
+      onStartActivity(selectedActivityId, selectedTagIds);
       setSelectedCategoryId(null);
       setSelectedActivityId(null);
       setSearchQuery("");
+      setSelectedTagIds([]);
     }
-  }, [selectedActivityId, onStartActivity]);
+  }, [selectedActivityId, selectedTagIds, onStartActivity]);
 
   const handleCategoryPress = useCallback((categoryId: string): void => {
     setSelectedCategoryId((prev) => (prev === categoryId ? null : categoryId));
@@ -227,6 +240,28 @@ export function NewSessionModal({
             keyboardShouldPersistTaps="handled"
           />
 
+          {/* Tags affordance */}
+          <Pressable
+            style={styles.tagsRow}
+            onPress={() => setTagPickerOpen(true)}
+          >
+            <Feather name="tag" size={14} color={COLORS.onSurfaceVariant} />
+            {selectedTags.length === 0 ? (
+              <Text style={styles.tagsPlaceholder}>Add tags (optional)</Text>
+            ) : (
+              <View style={styles.tagChipsRow}>
+                {selectedTags.map((t) => (
+                  <TagChip key={t.id} name={t.name} color={t.color} />
+                ))}
+              </View>
+            )}
+            <Feather
+              name="chevron-right"
+              size={16}
+              color={COLORS.onSurfaceVariant}
+            />
+          </Pressable>
+
           {/* Start button */}
           <GradientButton
             shape="pill"
@@ -237,6 +272,13 @@ export function NewSessionModal({
             <Feather name="play" size={18} color={COLORS.onPrimary} />
           </GradientButton>
         </View>
+
+        <TagPicker
+          visible={tagPickerOpen}
+          initialSelectedIds={selectedTagIds}
+          onClose={() => setTagPickerOpen(false)}
+          onConfirm={setSelectedTagIds}
+        />
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -382,5 +424,26 @@ const styles = StyleSheet.create({
   activityCategory: {
     ...TYPOGRAPHY.bodySmall,
     marginTop: 2,
+  },
+  tagsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  tagsPlaceholder: {
+    flex: 1,
+    ...TYPOGRAPHY.body,
+    color: COLORS.onSurfaceVariant,
+  },
+  tagChipsRow: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
   },
 });

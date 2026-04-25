@@ -13,18 +13,43 @@ export async function getRunningEntry(): Promise<TimeEntryRecord | null> {
   );
 }
 
-/** Start a new time entry (timer mode) */
+/**
+ * Start a new time entry (timer mode). Optionally attaches a set of tags
+ * inside the same transaction so the entry never exists tagless on disk.
+ */
 export async function startEntry(params: {
   activityId: string;
   timezone: string;
+  tagIds?: string[];
 }): Promise<string> {
   const id = generateId();
   const now = nowUTC();
-  await db.execute(
-    `INSERT INTO time_entries (id, user_id, activity_id, started_at, ended_at, duration_seconds, timezone, note, source, created_at, updated_at)
-     VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, 'timer', ?, ?)`,
-    [id, params.activityId, now, params.timezone, now, now]
-  );
+  const tagIds = params.tagIds && params.tagIds.length > 0
+    ? Array.from(new Set(params.tagIds))
+    : null;
+
+  if (tagIds) {
+    await db.writeTransaction(async (tx) => {
+      await tx.execute(
+        `INSERT INTO time_entries (id, user_id, activity_id, started_at, ended_at, duration_seconds, timezone, note, source, created_at, updated_at)
+         VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, 'timer', ?, ?)`,
+        [id, params.activityId, now, params.timezone, now, now]
+      );
+      for (const tagId of tagIds) {
+        await tx.execute(
+          `INSERT INTO entry_tags (id, entry_id, tag_id, created_at)
+           VALUES (?, ?, ?, ?)`,
+          [generateId(), id, tagId, now]
+        );
+      }
+    });
+  } else {
+    await db.execute(
+      `INSERT INTO time_entries (id, user_id, activity_id, started_at, ended_at, duration_seconds, timezone, note, source, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, 'timer', ?, ?)`,
+      [id, params.activityId, now, params.timezone, now, now]
+    );
+  }
   return id;
 }
 

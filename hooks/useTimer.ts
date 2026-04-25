@@ -43,7 +43,7 @@ export interface UseTimerResult {
   /** True while the initial query is loading */
   isLoading: boolean;
   /** Start tracking a new activity. Throws if a timer is already running. */
-  startActivity: (activityId: string) => Promise<void>;
+  startActivity: (activityId: string, tagIds?: string[]) => Promise<void>;
   /** Stop the current timer. No-op if nothing is running. */
   stopActivity: () => Promise<void>;
   /** Stop current timer and immediately start a new one (single transaction). */
@@ -83,10 +83,13 @@ export function useTimer(): UseTimerResult {
     };
   }, [row, elapsedSeconds]);
 
-  const startActivity = useCallback(async (activityId: string): Promise<void> => {
-    const timezone = getCurrentTimezone();
-    await startEntry({ activityId, timezone });
-  }, []);
+  const startActivity = useCallback(
+    async (activityId: string, tagIds?: string[]): Promise<void> => {
+      const timezone = getCurrentTimezone();
+      await startEntry({ activityId, timezone, tagIds });
+    },
+    [],
+  );
 
   const stopActivity = useCallback(async (): Promise<void> => {
     if (row === null) return;

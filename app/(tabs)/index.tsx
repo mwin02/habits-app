@@ -2,7 +2,12 @@ import { ForgottenTimerModal } from "@/components/timer/forgotten-timer-modal";
 import { TimerCard } from "@/components/timer/timer-card";
 import { QuickSwitchSection } from "@/components/timer/quick-switch-section";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
-import { endForgottenEntry, deleteEntry } from "@/db/queries";
+import {
+  endForgottenEntry,
+  deleteEntry,
+  getRunningEntry,
+  setEntryTags,
+} from "@/db/queries";
 import { useTimer } from "@/hooks/useTimer";
 import { useForgottenTimer } from "@/hooks/useForgottenTimer";
 import { useCategoriesWithActivities } from "@/hooks/useCategoriesWithActivities";
@@ -65,11 +70,18 @@ export default function HomeScreen(): React.ReactElement {
   );
 
   const handleStartFromModal = useCallback(
-    async (activityId: string): Promise<void> => {
+    async (activityId: string, tagIds: string[]): Promise<void> => {
       if (runningEntry) {
+        // Switch path: tags are applied after the switch transaction lands.
+        // Local SQLite writes serialize, so the new entry exists by the time
+        // we read it back.
         await switchActivity(activityId);
+        if (tagIds.length > 0) {
+          const newEntry = await getRunningEntry();
+          if (newEntry) await setEntryTags(newEntry.id, tagIds);
+        }
       } else {
-        await startActivity(activityId);
+        await startActivity(activityId, tagIds);
       }
       setModalVisible(false);
     },
