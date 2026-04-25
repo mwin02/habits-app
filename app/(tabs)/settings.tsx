@@ -100,7 +100,7 @@ export default function SettingsScreen(): React.ReactElement {
         />
         <SettingRow
           title="Manage categories"
-          description="Rename, recolor, or change category icons"
+          description="Recolor or change category icons"
           onPress={goToManageCategories}
           iconBackground={COLORS.surfaceContainer}
           iconChildren={

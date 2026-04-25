@@ -22,7 +22,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -39,7 +38,6 @@ export function EditCategoryModal({
   category,
 }: EditCategoryModalProps): React.ReactElement {
   const insets = useSafeAreaInsets();
-  const [name, setName] = useState(category?.name ?? "");
   const [color, setColor] = useState<string>(
     category?.color ?? CATEGORY_PALETTE[0],
   );
@@ -48,7 +46,6 @@ export function EditCategoryModal({
 
   useEffect(() => {
     if (visible && category) {
-      setName(category.name);
       setColor(category.color);
       setIcon(category.icon);
       setSubmitting(false);
@@ -59,24 +56,19 @@ export function EditCategoryModal({
     onClose();
   }, [onClose]);
 
-  const trimmedName = name.trim();
-  const canSubmit = trimmedName.length > 0 && !submitting && category !== null;
+  const canSubmit = !submitting && category !== null;
 
   const handleSubmit = useCallback(async (): Promise<void> => {
     if (!canSubmit || !category) return;
     setSubmitting(true);
     try {
-      await updateCategory(category.id, {
-        name: trimmedName,
-        color,
-        icon,
-      });
+      await updateCategory(category.id, { color, icon });
       onClose();
     } catch (err) {
       setSubmitting(false);
       console.error("Failed to save category", err);
     }
-  }, [canSubmit, category, trimmedName, color, icon, onClose]);
+  }, [canSubmit, category, color, icon, onClose]);
 
   return (
     <Modal
@@ -97,29 +89,17 @@ export function EditCategoryModal({
           <View style={styles.handleBar} />
 
           <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>Edit Category</Text>
+            <View style={styles.headerTextWrap}>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {category?.name ?? "Edit Category"}
+              </Text>
               <Text style={styles.headerSubtitle}>
-                Rename, recolor, or pick an icon
+                Recolor or pick an icon
               </Text>
             </View>
             <Pressable onPress={handleClose} style={styles.closeButton}>
               <Feather name="x" size={22} color={COLORS.onSurface} />
             </Pressable>
-          </View>
-
-          <Text style={styles.sectionLabel}>Category Name</Text>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Work"
-              placeholderTextColor={COLORS.onSurfaceVariant}
-              value={name}
-              onChangeText={setName}
-              autoCorrect={false}
-              maxLength={50}
-              returnKeyType="done"
-            />
           </View>
 
           <Text style={styles.sectionLabel}>Appearance</Text>
@@ -130,9 +110,6 @@ export function EditCategoryModal({
             >
               <CategoryIcon icon={icon ?? "circle"} size={20} color={color} />
             </View>
-            <Text style={styles.previewHint}>
-              {trimmedName.length > 0 ? trimmedName : "Category preview"}
-            </Text>
           </View>
 
           <ScrollView
@@ -236,6 +213,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: SPACING["2xl"],
   },
+  headerTextWrap: {
+    flex: 1,
+    marginRight: SPACING.md,
+  },
   headerTitle: {
     ...TYPOGRAPHY.headingXl,
     color: COLORS.onSurface,
@@ -255,18 +236,6 @@ const styles = StyleSheet.create({
     color: COLORS.onSurfaceVariant,
     marginBottom: SPACING.md,
   },
-  inputContainer: {
-    backgroundColor: COLORS.surfaceContainerLow,
-    borderRadius: RADIUS.xl,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    marginBottom: SPACING["2xl"],
-  },
-  input: {
-    ...TYPOGRAPHY.body,
-    color: COLORS.onSurface,
-    padding: 0,
-  },
   previewRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -279,10 +248,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     alignItems: "center",
     justifyContent: "center",
-  },
-  previewHint: {
-    ...TYPOGRAPHY.bodySmall,
-    color: COLORS.onSurfaceVariant,
   },
   appearanceScroll: {
     flexGrow: 0,
