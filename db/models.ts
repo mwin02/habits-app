@@ -8,9 +8,19 @@ export type {
   ActivityRecord,
   CategoryRecord,
   DailySummaryRecord,
+  EntryTagRecord,
   IdealAllocationRecord,
+  TagRecord,
   TimeEntryRecord,
 } from "./schema";
+
+/** A tag as displayed in the UI */
+export interface TagItem {
+  id: string;
+  name: string;
+  color: string;
+  sortOrder: number;
+}
 
 /** Source of a time entry */
 export type TimeEntrySource = "timer" | "manual" | "retroactive" | "import";

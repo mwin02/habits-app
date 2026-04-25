@@ -105,6 +105,38 @@ const notification_preferences = new Table(
   { localOnly: true }
 );
 
+const tags = new Table(
+  {
+    user_id: column.text,         // null until account created (deferred auth)
+    name: column.text,
+    color: column.text,
+    sort_order: column.integer,
+    is_archived: column.integer,  // 0 or 1
+    created_at: column.text,
+    updated_at: column.text,
+    deleted_at: column.text,
+  },
+  { localOnly: true, indexes: { by_sort: ['sort_order'] } }
+);
+
+// Join table: many-to-many between time_entries and tags.
+// PowerSync auto-creates an `id` column. We dedupe (entry_id, tag_id) pairs
+// in `setEntryTags` rather than relying on a DB-level UNIQUE constraint.
+const entry_tags = new Table(
+  {
+    entry_id: column.text,
+    tag_id: column.text,
+    created_at: column.text,
+  },
+  {
+    localOnly: true,
+    indexes: {
+      by_entry: ['entry_id'],
+      by_tag: ['tag_id'],
+    },
+  }
+);
+
 const daily_summaries = new Table(
   {
     user_id: column.text,
@@ -123,6 +155,8 @@ export const AppSchema = new Schema({
   time_entries,
   ideal_allocations,
   notification_preferences,
+  tags,
+  entry_tags,
   daily_summaries,
 });
 
@@ -132,4 +166,6 @@ export type ActivityRecord = Database['activities'];
 export type TimeEntryRecord = Database['time_entries'];
 export type IdealAllocationRecord = Database['ideal_allocations'];
 export type NotificationPreferencesRecord = Database['notification_preferences'];
+export type TagRecord = Database['tags'];
+export type EntryTagRecord = Database['entry_tags'];
 export type DailySummaryRecord = Database['daily_summaries'];
