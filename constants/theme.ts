@@ -173,13 +173,19 @@ export const TYPOGRAPHY = {
 export const CATEGORY_PALETTE: readonly string[] = [
   '#4A90D9', // work blue
   '#3498DB', // travel blue
+  '#5C6BC0', // indigo
   '#2ECC71', // learning green
+  '#27AE60', // deep green
   '#1ABC9C', // personal care teal
+  '#16A085', // deep teal
   '#F39C12', // meals orange
+  '#D35400', // burnt orange
+  '#D4AC0D', // mustard
   '#E74C3C', // health red
   '#E91E63', // social pink
   '#9B59B6', // entertainment purple
   '#8E44AD', // sleep purple
+  '#34495E', // midnight slate
   '#95A5A6', // chores gray
 ];
 
