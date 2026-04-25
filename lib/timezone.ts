@@ -105,6 +105,59 @@ export function getStartOfDay(dateStr: string, timezone: string): Date {
 }
 
 /**
+ * Parse a 24-hour `HH:MM` string into a UTC `Date` representing that local
+ * time on `dateStr` (`YYYY-MM-DD`) in the given timezone. DST-safe.
+ *
+ * Throws if `hhMM` is not a valid 24-hour time.
+ */
+export function parseLocalTimeOfDay(
+  hhMM: string,
+  dateStr: string,
+  timezone: string,
+): Date {
+  const match = /^(\d{2}):(\d{2})$/.exec(hhMM);
+  if (!match) throw new Error(`parseLocalTimeOfDay: invalid time "${hhMM}"`);
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    throw new Error(`parseLocalTimeOfDay: out of range "${hhMM}"`);
+  }
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const guess = Date.UTC(y, m - 1, d, hours, minutes);
+  const adjust = (ms: number): number => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date(ms));
+    const get = (t: string): number =>
+      Number(parts.find((p) => p.type === t)?.value ?? 0);
+    const hour = get('hour') === 24 ? 0 : get('hour');
+    const asIfUTC = Date.UTC(
+      get('year'),
+      get('month') - 1,
+      get('day'),
+      hour,
+      get('minute'),
+      get('second'),
+    );
+    return ms - (asIfUTC - guess);
+  };
+  const first = adjust(guess);
+  return new Date(adjust(first));
+}
+
+/** YYYY-MM-DD for the given Date in the given timezone. */
+export function getDateInTimezone(date: Date, timezone: string): string {
+  return date.toLocaleDateString('en-CA', { timeZone: timezone });
+}
+
+/**
  * Get the end of a day (last instant before next local midnight) in a given
  * timezone, returned as a Date object in UTC. DST-safe — uses the next day's
  * local midnight rather than adding a fixed 24h.

@@ -62,8 +62,9 @@ export async function seedNotificationPreferencesIfNeeded(): Promise<void> {
     `INSERT INTO notification_preferences
        (id, user_id, idle_reminder_enabled, long_running_enabled,
         threshold_override_seconds, has_asked_permission,
+        quiet_hours_enabled, quiet_hours_start, quiet_hours_end,
         created_at, updated_at)
-     VALUES (?, NULL, 1, 1, NULL, 0, ?, ?)`,
+     VALUES (?, NULL, 1, 1, NULL, 0, 0, '22:00', '07:00', ?, ?)`,
     [generateId(), now, now]
   );
 }

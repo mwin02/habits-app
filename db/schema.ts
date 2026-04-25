@@ -95,6 +95,9 @@ const notification_preferences = new Table(
     long_running_enabled: column.integer,        // 0 or 1
     threshold_override_seconds: column.integer,  // null = compute from median
     has_asked_permission: column.integer,        // 0 or 1
+    quiet_hours_enabled: column.integer,         // 0 or 1, null treated as 0
+    quiet_hours_start: column.text,              // 'HH:MM' 24h local time
+    quiet_hours_end: column.text,                // 'HH:MM'; if end <= start, window wraps midnight
     created_at: column.text,
     updated_at: column.text,
     deleted_at: column.text,

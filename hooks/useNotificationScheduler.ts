@@ -5,6 +5,7 @@ import { AppState, type AppStateStatus } from "react-native";
 import {
   IDLE_REMINDER_DELAY_SECONDS,
   NOTIFICATION_PREFERENCES_QUERY,
+  deferForQuietHours,
   resolveLongRunningThreshold,
   updateNotificationPreferences,
 } from "@/db/queries";
@@ -72,10 +73,14 @@ export function useNotificationScheduler(): void {
   const idleEnabled = prefs?.idle_reminder_enabled === 1;
   const longRunningEnabled = prefs?.long_running_enabled === 1;
   const thresholdOverride = prefs?.threshold_override_seconds ?? null;
+  const quietHoursEnabled = prefs?.quiet_hours_enabled === 1;
+  const quietHoursStart = prefs?.quiet_hours_start ?? null;
+  const quietHoursEnd = prefs?.quiet_hours_end ?? null;
 
   const prevEntryIdRef = useRef<string | null | undefined>(undefined);
   const prevIdleEnabledRef = useRef<boolean | undefined>(undefined);
   const prevLongRunningEnabledRef = useRef<boolean | undefined>(undefined);
+  const prevQuietHoursKeyRef = useRef<string | undefined>(undefined);
   const permissionAskedRef = useRef(false);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
@@ -113,7 +118,7 @@ export function useNotificationScheduler(): void {
       // First observation after mount: only ensure long-running is in place.
       if (prev === undefined) {
         if (running !== null && longRunningEnabled) {
-          await scheduleLongRunningForEntry(running);
+          await scheduleLongRunningForEntry(running, prefs);
         }
         prevEntryIdRef.current = currId;
         return;
@@ -122,14 +127,12 @@ export function useNotificationScheduler(): void {
       if (prev === null && currId !== null && running !== null) {
         await cancelIdleReminder();
         if (longRunningEnabled) {
-          await scheduleLongRunningForEntry(running);
+          await scheduleLongRunningForEntry(running, prefs);
         }
       } else if (prev !== null && currId === null) {
         await cancelLongRunningReminder(prev);
         if (idleEnabled) {
-          await scheduleIdleReminder(
-            new Date(Date.now() + IDLE_REMINDER_DELAY_SECONDS * 1000),
-          );
+          await scheduleIdleAt(prefs);
         }
       } else if (
         prev !== null &&
@@ -139,7 +142,7 @@ export function useNotificationScheduler(): void {
       ) {
         await cancelLongRunningReminder(prev);
         if (longRunningEnabled) {
-          await scheduleLongRunningForEntry(running);
+          await scheduleLongRunningForEntry(running, prefs);
         }
       }
 
@@ -178,9 +181,7 @@ export function useNotificationScheduler(): void {
 
       if (idleChanged) {
         if (idleEnabled && running === null) {
-          await scheduleIdleReminder(
-            new Date(Date.now() + IDLE_REMINDER_DELAY_SECONDS * 1000),
-          );
+          await scheduleIdleAt(prefs);
         } else if (!idleEnabled) {
           await cancelIdleReminder();
         }
@@ -188,13 +189,49 @@ export function useNotificationScheduler(): void {
 
       if (longRunningChanged && running !== null) {
         if (longRunningEnabled) {
-          await scheduleLongRunningForEntry(running);
+          await scheduleLongRunningForEntry(running, prefs);
         } else {
           await cancelLongRunningReminder(running.entry_id);
         }
       }
     })();
   }, [idleEnabled, longRunningEnabled, prefs, running]);
+
+  // Re-reconcile when quiet-hours fields change so an active schedule shifts
+  // to (or away from) the deferred fire time without waiting for the next
+  // entry transition or app foreground.
+  useEffect(() => {
+    if (!prefs) return;
+    const key = `${quietHoursEnabled ? 1 : 0}|${quietHoursStart ?? ""}|${quietHoursEnd ?? ""}`;
+    const prev = prevQuietHoursKeyRef.current;
+    prevQuietHoursKeyRef.current = key;
+    if (prev === undefined || prev === key) return;
+
+    void (async () => {
+      const granted = await hasNotificationPermission();
+      if (!granted) return;
+      if (running !== null && longRunningEnabled) {
+        await scheduleLongRunningForEntry(running, prefs);
+      }
+      if (running === null && idleEnabled) {
+        // Only reschedule the idle reminder if one is already pending —
+        // otherwise we'd be inventing a brand-new reminder out of a config
+        // change, which is the wrong UX.
+        const ids = await getScheduledIds();
+        if (ids.includes(IDLE_REMINDER_ID)) {
+          await scheduleIdleAt(prefs);
+        }
+      }
+    })();
+  }, [
+    prefs,
+    quietHoursEnabled,
+    quietHoursStart,
+    quietHoursEnd,
+    idleEnabled,
+    longRunningEnabled,
+    running,
+  ]);
 
   // Foreground reconciliation: drop orphaned schedules and recheck permission.
   useEffect(() => {
@@ -227,14 +264,26 @@ export function useNotificationScheduler(): void {
   }, [running?.entry_id]);
 }
 
-async function scheduleLongRunningForEntry(row: RunningRow): Promise<void> {
+async function scheduleLongRunningForEntry(
+  row: RunningRow,
+  prefs: NotificationPreferencesRecord | null,
+): Promise<void> {
   const threshold = await resolveLongRunningThreshold(row.activity_id);
   const startedAt = new Date(row.started_at).getTime();
-  const fireAt = new Date(startedAt + threshold * 1000);
+  const rawFireAt = new Date(startedAt + threshold * 1000);
+  const fireAt = deferForQuietHours(rawFireAt, prefs);
+  // firesAfterSeconds drives the body copy ("Xh Ym so far") — keep it tied to
+  // the threshold rather than the deferred wall-clock time so it stays
+  // truthful about elapsed work, not elapsed wait.
   await scheduleLongRunningReminder({
     entryId: row.entry_id,
     activityName: row.activity_name,
     fireAt,
     firesAfterSeconds: threshold,
   });
+}
+
+function scheduleIdleAt(prefs: NotificationPreferencesRecord | null): Promise<void> {
+  const rawFireAt = new Date(Date.now() + IDLE_REMINDER_DELAY_SECONDS * 1000);
+  return scheduleIdleReminder(deferForQuietHours(rawFireAt, prefs));
 }

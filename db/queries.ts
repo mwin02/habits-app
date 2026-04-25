@@ -1,4 +1,9 @@
 import { db } from '@/lib/powersync';
+import {
+  getCurrentTimezone,
+  getDateInTimezone,
+  parseLocalTimeOfDay,
+} from '@/lib/timezone';
 import { generateId } from '@/lib/uuid';
 import type {
   CategoryRecord,
@@ -645,6 +650,7 @@ export const IDLE_REMINDER_DELAY_SECONDS = 30 * 60;
 export const NOTIFICATION_PREFERENCES_QUERY = `
   SELECT id, user_id, idle_reminder_enabled, long_running_enabled,
          threshold_override_seconds, has_asked_permission,
+         quiet_hours_enabled, quiet_hours_start, quiet_hours_end,
          created_at, updated_at, deleted_at
   FROM notification_preferences
   WHERE deleted_at IS NULL
@@ -662,6 +668,9 @@ export interface NotificationPreferencesPatch {
   long_running_enabled?: number;
   threshold_override_seconds?: number | null;
   has_asked_permission?: number;
+  quiet_hours_enabled?: number;
+  quiet_hours_start?: string | null;
+  quiet_hours_end?: string | null;
 }
 
 /** Partial update of the singleton preferences row. */
@@ -687,6 +696,18 @@ export async function updateNotificationPreferences(
     fields.push('has_asked_permission = ?');
     values.push(patch.has_asked_permission);
   }
+  if (patch.quiet_hours_enabled !== undefined) {
+    fields.push('quiet_hours_enabled = ?');
+    values.push(patch.quiet_hours_enabled);
+  }
+  if (patch.quiet_hours_start !== undefined) {
+    fields.push('quiet_hours_start = ?');
+    values.push(patch.quiet_hours_start);
+  }
+  if (patch.quiet_hours_end !== undefined) {
+    fields.push('quiet_hours_end = ?');
+    values.push(patch.quiet_hours_end);
+  }
 
   if (fields.length === 0) return;
 
@@ -700,6 +721,59 @@ export async function updateNotificationPreferences(
      WHERE deleted_at IS NULL`,
     values
   );
+}
+
+/**
+ * Defer a notification's fire time out of the user's configured quiet-hours
+ * window. Returns the original Date if quiet hours are disabled, the prefs
+ * are missing, or `fireAt` is outside any window. Otherwise returns the
+ * end-of-window Date the reminder should fire at instead.
+ *
+ * Wraps midnight when `end <= start` (e.g. 22:00 → 07:00).
+ */
+export function deferForQuietHours(
+  fireAt: Date,
+  prefs: NotificationPreferencesRecord | null,
+): Date {
+  if (!prefs || prefs.quiet_hours_enabled !== 1) return fireAt;
+  const start = prefs.quiet_hours_start;
+  const end = prefs.quiet_hours_end;
+  if (!start || !end || start === end) return fireAt;
+
+  const tz = getCurrentTimezone();
+  const fireDateStr = getDateInTimezone(fireAt, tz);
+  const startToday = parseLocalTimeOfDay(start, fireDateStr, tz);
+  const endToday = parseLocalTimeOfDay(end, fireDateStr, tz);
+  const wraps = endToday.getTime() <= startToday.getTime();
+
+  if (!wraps) {
+    if (fireAt >= startToday && fireAt < endToday) return endToday;
+    return fireAt;
+  }
+
+  // Window wraps midnight. Two windows are relevant: the one that began
+  // yesterday (ending today's `end`) and the one that begins today's `start`
+  // (ending tomorrow's `end`).
+  const fireMs = fireAt.getTime();
+  if (fireMs < endToday.getTime()) {
+    const startYesterday = parseLocalTimeOfDay(
+      start,
+      shiftDateStr(fireDateStr, -1),
+      tz,
+    );
+    if (fireMs >= startYesterday.getTime()) return endToday;
+    return fireAt;
+  }
+  if (fireMs >= startToday.getTime()) {
+    return parseLocalTimeOfDay(end, shiftDateStr(fireDateStr, 1), tz);
+  }
+  return fireAt;
+}
+
+function shiftDateStr(dateStr: string, deltaDays: number): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
 }
 
 /**

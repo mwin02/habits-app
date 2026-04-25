@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PermissionBanner } from "@/components/settings/permission-banner";
+import { QuietHoursSection } from "@/components/settings/quiet-hours-section";
 import { SettingRow } from "@/components/settings/setting-row";
 import { ThresholdPicker } from "@/components/settings/threshold-picker";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
@@ -117,6 +118,9 @@ export default function NotificationsSettingsScreen(): React.ReactElement {
               : "A fixed threshold is applied to every activity."}
           </Text>
         </View>
+
+        <Text style={styles.sectionLabel}>Quiet hours</Text>
+        <QuietHoursSection prefs={prefs} permissionDenied={permissionDenied} />
       </ScrollView>
     </SafeAreaView>
   );
