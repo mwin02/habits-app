@@ -53,6 +53,8 @@ habits-app/
 │   │   ├── timeline.tsx    # Day Timeline tab
 │   │   ├── insights.tsx    # Insights tab
 │   │   └── settings.tsx    # Settings tab
+│   ├── notifications-settings.tsx # Idle/long-running toggles, threshold, quiet hours
+│   ├── manage-activities.tsx      # Add/rename/archive categories and activities
 │   └── _layout.tsx         # Root layout (PowerSync provider, DB init, seed)
 ├── components/             # Reusable UI components
 │   ├── timer/              # Timer display, activity picker, quick-switch
@@ -102,7 +104,7 @@ habits-app/
 - **activities** — Belongs to a category. E.g., "Deep Work" under "Work"
 - **time_entries** — Core data. `started_at`, `ended_at`, `duration_seconds`, `timezone`, `note`, `source` (timer/manual/retroactive/import)
 - **ideal_allocations** — User's target minutes per day per category
-- **notification_preferences** — Singleton row. `idle_reminder_enabled`, `long_running_enabled`, `threshold_override_seconds` (nullable — null = compute from activity median), `has_asked_permission`
+- **notification_preferences** — Singleton row. `idle_reminder_enabled`, `long_running_enabled`, `threshold_override_seconds` (nullable — null = compute from activity median), `has_asked_permission`, `quiet_hours_enabled`, `quiet_hours_start`, `quiet_hours_end` (HH:MM 24h local; NULL on pre-v3 rows = disabled; `end <= start` wraps midnight)
 - **daily_summaries** — Pre-aggregated daily totals (computed, not user-edited)
 
 All tables have `updated_at`, `deleted_at` (soft delete) columns. All tables are `localOnly: true` until Phase 3 (sync).
@@ -141,6 +143,11 @@ npx expo start --clear
 ### Quick-switch
 
 One tap stops current activity and starts new one. No confirmation modal. Show toast.
+
+### Notifications
+
+- `useNotificationScheduler` is **mounted once at the root** and is purely **reactive** — it watches the running-entry query + `notification_preferences` and never gets called imperatively from `useTimer`. Every code path that mutates `time_entries` is automatically covered.
+- Quiet hours **defer** `fireAt`, they don't drop it. Wrap every Date with `deferForQuietHours(fireAt, prefs)` from `db/queries.ts` before passing to `scheduleIdleReminder` / `scheduleLongRunningReminder`.
 
 ### Forgotten stop detection
 
@@ -183,6 +190,7 @@ On app foreground, check for `time_entries` where `ended_at IS NULL`. If found a
 - `getCurrentTimezone()` — Returns current IANA timezone string
 - `getTodayDate(timezone)` — Returns `YYYY-MM-DD` for today in the given timezone
 - `getStartOfDay(dateStr, timezone)` — UTC `Date` for local midnight of `dateStr`
+- `parseLocalTimeOfDay(hhMM, dateStr, tz)` — combines `YYYY-MM-DD` + `HH:MM` into a UTC `Date`, DST-safe (same two-pass adjust as `getStartOfDay`)
 - `getEndOfDay(dateStr, timezone)` — UTC `Date` for the last instant of that local day (DST-safe)
 - `formatTimeInTimezone(isoString, timezone)` — Formats time for display (e.g., "9:30 AM")
 - `formatDuration(seconds)` — Human-readable duration (e.g., "1h 30m")
