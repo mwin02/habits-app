@@ -54,6 +54,10 @@ export default function SettingsScreen(): React.ReactElement {
     router.push("/manage-activities");
   }, [router]);
 
+  const goToManageTags = useCallback(() => {
+    router.push("/manage-tags");
+  }, [router]);
+
   const notificationSummary = useMemo(
     () => buildNotificationSummary(prefs),
     [prefs],
@@ -97,6 +101,15 @@ export default function SettingsScreen(): React.ReactElement {
           iconBackground={COLORS.surfaceContainer}
           iconChildren={
             <Feather name="list" size={20} color={COLORS.primary} />
+          }
+        />
+        <SettingRow
+          title="Manage tags"
+          description="Add, rename, recolor, or archive tags"
+          onPress={goToManageTags}
+          iconBackground={COLORS.surfaceContainer}
+          iconChildren={
+            <Feather name="tag" size={20} color={COLORS.primary} />
           }
         />
       </ScrollView>
