@@ -4,7 +4,6 @@ import {
 } from "@/components/common/category-icon";
 import { GradientButton } from "@/components/common/gradient-button";
 import {
-  CATEGORY_PALETTE,
   COLORS,
   FONTS,
   RADIUS,
@@ -52,9 +51,6 @@ export function CreateActivityModal({
     initialActivity?.categoryId ?? initialCategoryId ?? null,
   );
   // null = "use category default" (writes NULL to DB)
-  const [colorOverride, setColorOverride] = useState<string | null>(
-    initialActivity?.colorOverride ?? null,
-  );
   const [iconOverride, setIconOverride] = useState<string | null>(
     initialActivity?.iconOverride ?? null,
   );
@@ -66,7 +62,6 @@ export function CreateActivityModal({
       setSelectedCategoryId(
         initialActivity?.categoryId ?? initialCategoryId ?? null,
       );
-      setColorOverride(initialActivity?.colorOverride ?? null);
       setIconOverride(initialActivity?.iconOverride ?? null);
       setSubmitting(false);
     }
@@ -75,7 +70,6 @@ export function CreateActivityModal({
   const reset = useCallback((): void => {
     setName("");
     setSelectedCategoryId(null);
-    setColorOverride(null);
     setIconOverride(null);
     setSubmitting(false);
   }, []);
@@ -96,14 +90,12 @@ export function CreateActivityModal({
         await updateActivity(initialActivity.id, {
           name: trimmedName,
           categoryId: selectedCategoryId,
-          color: colorOverride,
           icon: iconOverride,
         });
       } else {
         await createActivity({
           categoryId: selectedCategoryId,
           name: trimmedName,
-          color: colorOverride,
           icon: iconOverride,
         });
       }
@@ -121,7 +113,6 @@ export function CreateActivityModal({
     onClose,
     isEdit,
     initialActivity,
-    colorOverride,
     iconOverride,
   ]);
 
@@ -130,11 +121,9 @@ export function CreateActivityModal({
     categoryRows.push(categories.slice(i, i + 2));
   }
 
-  // Resolve preview color/icon — override if set, else parent category, else
-  // a neutral fallback when no category is selected yet.
+  // Color always comes from the parent category. Only the icon is overridable.
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId) ?? null;
-  const previewColor =
-    colorOverride ?? selectedCategory?.color ?? COLORS.onSurfaceVariant;
+  const previewColor = selectedCategory?.color ?? COLORS.onSurfaceVariant;
   const previewIcon = iconOverride ?? selectedCategory?.icon ?? null;
 
   return (
@@ -231,15 +220,9 @@ export function CreateActivityModal({
           </ScrollView>
 
           <View style={styles.appearanceHeader}>
-            <Text style={styles.sectionLabel}>Appearance</Text>
-            {(colorOverride !== null || iconOverride !== null) && (
-              <Pressable
-                onPress={() => {
-                  setColorOverride(null);
-                  setIconOverride(null);
-                }}
-                hitSlop={8}
-              >
+            <Text style={styles.sectionLabel}>Icon</Text>
+            {iconOverride !== null && (
+              <Pressable onPress={() => setIconOverride(null)} hitSlop={8}>
                 <Text style={styles.resetLabel}>Use category default</Text>
               </Pressable>
             )}
@@ -259,40 +242,11 @@ export function CreateActivityModal({
               />
             </View>
             <Text style={styles.previewHint}>
-              {colorOverride === null && iconOverride === null
+              {iconOverride === null
                 ? "Inheriting from category"
-                : "Custom appearance"}
+                : "Custom icon"}
             </Text>
           </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.swatchRow}
-            style={styles.appearanceScroll}
-            keyboardShouldPersistTaps="handled"
-          >
-            {CATEGORY_PALETTE.map((swatch) => {
-              const isSelected = colorOverride === swatch;
-              return (
-                <Pressable
-                  key={swatch}
-                  onPress={() =>
-                    setColorOverride(isSelected ? null : swatch)
-                  }
-                  style={[
-                    styles.swatch,
-                    { backgroundColor: swatch },
-                    isSelected && styles.swatchSelected,
-                  ]}
-                >
-                  {isSelected && (
-                    <Feather name="check" size={16} color={COLORS.onPrimary} />
-                  )}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
 
           <ScrollView
             horizontal
@@ -475,21 +429,6 @@ const styles = StyleSheet.create({
   appearanceScroll: {
     flexGrow: 0,
     marginBottom: SPACING.md,
-  },
-  swatchRow: {
-    gap: SPACING.sm,
-    paddingRight: SPACING.lg,
-  },
-  swatch: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.full,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  swatchSelected: {
-    borderWidth: 2,
-    borderColor: COLORS.onSurface,
   },
   iconRow: {
     gap: SPACING.sm,

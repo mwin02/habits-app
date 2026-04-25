@@ -39,11 +39,10 @@ export interface CategoryWithActivities {
 /**
  * An activity as displayed in the UI.
  *
- * `color` / `icon` are the *resolved* display values — activity override if
- * set, otherwise the parent category's value (see `resolveActivityVisuals`).
- * `categoryColor` is the parent's actual color, exposed separately for sites
- * that need to render the category itself (e.g. category badges) vs. the
- * activity (e.g. dot, icon).
+ * `icon` is the *resolved* display icon — activity override if set, else the
+ * parent category's icon. Color is intentionally category-only: color is the
+ * grouping signal across timeline/insights, so per-activity color is not
+ * supported.
  */
 export interface ActivityItem {
   id: string;
@@ -52,12 +51,8 @@ export interface ActivityItem {
   categoryColor: string;
   name: string;
   isPreset: boolean;
-  /** Resolved display color (override or category fallback). */
-  color: string;
   /** Resolved display icon (override or category fallback); null = no icon. */
   icon: string | null;
-  /** Raw activity-level override (null = inherit from category). */
-  colorOverride: string | null;
   /** Raw activity-level override (null = inherit from category). */
   iconOverride: string | null;
 }
@@ -68,7 +63,6 @@ export interface RunningTimer {
   activityId: string;
   activityName: string;
   categoryName: string;
-  /** Resolved activity color (override or category fallback). */
   categoryColor: string;
   startedAt: Date;
   elapsedSeconds: number;
@@ -80,7 +74,6 @@ export interface RecommendedActivity {
   activityId: string;
   activityName: string;
   categoryName: string;
-  /** Resolved activity color (override or category fallback). */
   categoryColor: string;
 }
 
@@ -89,7 +82,6 @@ export interface TimelineEntry {
   id: string;
   activityName: string;
   categoryName: string;
-  /** Resolved activity color (override or category fallback). */
   categoryColor: string;
   startedAt: Date;
   endedAt: Date | null;

@@ -32,10 +32,10 @@ const activities = new Table(
     user_id: column.text,         // null = system preset
     category_id: column.text,
     name: column.text,
-    // Per-activity overrides — NULL means inherit from parent category.
-    // Resolve via `resolveActivityVisuals` in `lib/activity-visuals.ts` (or
-    // SQL `COALESCE(a.color, c.color)`) at every display site.
-    color: column.text,
+    // Per-activity icon override — NULL means inherit from parent category.
+    // Color stays category-owned: color is the grouping signal across timeline
+    // and insights, so per-activity color would dilute it. Resolve via SQL
+    // `COALESCE(a.icon, c.icon)` at every display site.
     icon: column.text,
     is_preset: column.integer,    // 0 or 1
     sort_order: column.integer,

@@ -17,7 +17,6 @@ const CATEGORIES_WITH_ACTIVITIES_QUERY = `
     a.id          AS activity_id,
     a.name        AS activity_name,
     a.is_preset   AS activity_is_preset,
-    a.color       AS activity_color,
     a.icon        AS activity_icon
   FROM categories c
   LEFT JOIN activities a
@@ -39,7 +38,6 @@ interface FlatRow {
   activity_id: string | null;
   activity_name: string | null;
   activity_is_preset: number | null;
-  activity_color: string | null;
   activity_icon: string | null;
 }
 
@@ -84,9 +82,7 @@ export function useCategoriesWithActivities(): UseCategoriesWithActivitiesResult
           categoryColor: row.category_color,
           name: row.activity_name,
           isPreset: row.activity_is_preset === 1,
-          color: row.activity_color ?? row.category_color,
           icon: row.activity_icon ?? row.category_icon,
-          colorOverride: row.activity_color,
           iconOverride: row.activity_icon,
         });
       }

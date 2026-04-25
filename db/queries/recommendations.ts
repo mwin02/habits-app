@@ -14,7 +14,7 @@ export const RECOMMENDATION_QUERY = `
     a.id            AS activity_id,
     a.name          AS activity_name,
     c.name          AS category_name,
-    COALESCE(a.color, c.color) AS category_color
+    c.color         AS category_color
   FROM time_entries te
   JOIN activities a ON a.id = te.activity_id
   JOIN categories c ON c.id = a.category_id
