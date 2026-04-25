@@ -32,6 +32,13 @@ const ICON_MAP: Record<string, IconMapping> = {
 
 const DEFAULT_ICON: IconMapping = { set: 'feather', name: 'circle' };
 
+/**
+ * The set of icon keys recognized by `CategoryIcon`. Use this as the
+ * palette for icon pickers (e.g. activity-override editor) so we never
+ * surface a key that would silently fall back to the default circle.
+ */
+export const AVAILABLE_ICON_KEYS: readonly string[] = Object.keys(ICON_MAP);
+
 interface CategoryIconProps {
   icon: string | null;
   size?: number;

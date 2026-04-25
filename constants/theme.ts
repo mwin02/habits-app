@@ -166,6 +166,24 @@ export const TYPOGRAPHY = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Category / activity palette — picker swatches for category and activity
+// override editors. Mirrors the preset category colors so user-picked
+// activities stay visually consistent with the seeded set.
+// ---------------------------------------------------------------------------
+export const CATEGORY_PALETTE: readonly string[] = [
+  '#4A90D9', // work blue
+  '#3498DB', // travel blue
+  '#2ECC71', // learning green
+  '#1ABC9C', // personal care teal
+  '#F39C12', // meals orange
+  '#E74C3C', // health red
+  '#E91E63', // social pink
+  '#9B59B6', // entertainment purple
+  '#8E44AD', // sleep purple
+  '#95A5A6', // chores gray
+];
+
+// ---------------------------------------------------------------------------
 // Spacing scale (4-point grid)
 // ---------------------------------------------------------------------------
 export const SPACING = {

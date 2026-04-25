@@ -1,6 +1,16 @@
-import { CategoryIcon } from "@/components/common/category-icon";
+import {
+  AVAILABLE_ICON_KEYS,
+  CategoryIcon,
+} from "@/components/common/category-icon";
 import { GradientButton } from "@/components/common/gradient-button";
-import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
+import {
+  CATEGORY_PALETTE,
+  COLORS,
+  FONTS,
+  RADIUS,
+  SPACING,
+  TYPOGRAPHY,
+} from "@/constants/theme";
 import type { ActivityItem, CategoryWithActivities } from "@/db/models";
 import { createActivity, updateActivity } from "@/db/queries";
 import { Feather } from "@expo/vector-icons";
@@ -41,6 +51,13 @@ export function CreateActivityModal({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     initialActivity?.categoryId ?? initialCategoryId ?? null,
   );
+  // null = "use category default" (writes NULL to DB)
+  const [colorOverride, setColorOverride] = useState<string | null>(
+    initialActivity?.colorOverride ?? null,
+  );
+  const [iconOverride, setIconOverride] = useState<string | null>(
+    initialActivity?.iconOverride ?? null,
+  );
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -49,6 +66,8 @@ export function CreateActivityModal({
       setSelectedCategoryId(
         initialActivity?.categoryId ?? initialCategoryId ?? null,
       );
+      setColorOverride(initialActivity?.colorOverride ?? null);
+      setIconOverride(initialActivity?.iconOverride ?? null);
       setSubmitting(false);
     }
   }, [visible, initialActivity, initialCategoryId]);
@@ -56,6 +75,8 @@ export function CreateActivityModal({
   const reset = useCallback((): void => {
     setName("");
     setSelectedCategoryId(null);
+    setColorOverride(null);
+    setIconOverride(null);
     setSubmitting(false);
   }, []);
 
@@ -75,11 +96,15 @@ export function CreateActivityModal({
         await updateActivity(initialActivity.id, {
           name: trimmedName,
           categoryId: selectedCategoryId,
+          color: colorOverride,
+          icon: iconOverride,
         });
       } else {
         await createActivity({
           categoryId: selectedCategoryId,
           name: trimmedName,
+          color: colorOverride,
+          icon: iconOverride,
         });
       }
       reset();
@@ -88,12 +113,29 @@ export function CreateActivityModal({
       setSubmitting(false);
       console.error("Failed to save activity", err);
     }
-  }, [canSubmit, selectedCategoryId, trimmedName, reset, onClose, isEdit, initialActivity]);
+  }, [
+    canSubmit,
+    selectedCategoryId,
+    trimmedName,
+    reset,
+    onClose,
+    isEdit,
+    initialActivity,
+    colorOverride,
+    iconOverride,
+  ]);
 
   const categoryRows: CategoryWithActivities[][] = [];
   for (let i = 0; i < categories.length; i += 2) {
     categoryRows.push(categories.slice(i, i + 2));
   }
+
+  // Resolve preview color/icon — override if set, else parent category, else
+  // a neutral fallback when no category is selected yet.
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId) ?? null;
+  const previewColor =
+    colorOverride ?? selectedCategory?.color ?? COLORS.onSurfaceVariant;
+  const previewIcon = iconOverride ?? selectedCategory?.icon ?? null;
 
   return (
     <Modal
@@ -186,6 +228,103 @@ export function CreateActivityModal({
                 })}
               </View>
             ))}
+          </ScrollView>
+
+          <View style={styles.appearanceHeader}>
+            <Text style={styles.sectionLabel}>Appearance</Text>
+            {(colorOverride !== null || iconOverride !== null) && (
+              <Pressable
+                onPress={() => {
+                  setColorOverride(null);
+                  setIconOverride(null);
+                }}
+                hitSlop={8}
+              >
+                <Text style={styles.resetLabel}>Use category default</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <View style={styles.previewRow}>
+            <View
+              style={[
+                styles.previewBadge,
+                { backgroundColor: previewColor + "22" },
+              ]}
+            >
+              <CategoryIcon
+                icon={previewIcon ?? "circle"}
+                size={20}
+                color={previewColor}
+              />
+            </View>
+            <Text style={styles.previewHint}>
+              {colorOverride === null && iconOverride === null
+                ? "Inheriting from category"
+                : "Custom appearance"}
+            </Text>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.swatchRow}
+            style={styles.appearanceScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            {CATEGORY_PALETTE.map((swatch) => {
+              const isSelected = colorOverride === swatch;
+              return (
+                <Pressable
+                  key={swatch}
+                  onPress={() =>
+                    setColorOverride(isSelected ? null : swatch)
+                  }
+                  style={[
+                    styles.swatch,
+                    { backgroundColor: swatch },
+                    isSelected && styles.swatchSelected,
+                  ]}
+                >
+                  {isSelected && (
+                    <Feather name="check" size={16} color={COLORS.onPrimary} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.iconRow}
+            style={styles.appearanceScroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            {AVAILABLE_ICON_KEYS.map((iconKey) => {
+              const isSelected = iconOverride === iconKey;
+              return (
+                <Pressable
+                  key={iconKey}
+                  onPress={() =>
+                    setIconOverride(isSelected ? null : iconKey)
+                  }
+                  style={[
+                    styles.iconTile,
+                    isSelected && {
+                      backgroundColor: previewColor + "26",
+                      borderColor: previewColor,
+                    },
+                  ]}
+                >
+                  <CategoryIcon
+                    icon={iconKey}
+                    size={20}
+                    color={isSelected ? previewColor : COLORS.onSurfaceVariant}
+                  />
+                </Pressable>
+              );
+            })}
           </ScrollView>
 
           <GradientButton
@@ -304,5 +443,67 @@ const styles = StyleSheet.create({
   },
   categoryCardNameSelected: {
     color: COLORS.primary,
+  },
+  appearanceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: SPACING.md,
+  },
+  resetLabel: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.primary,
+    fontFamily: FONTS.jakartaSemiBold,
+  },
+  previewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  previewBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.lg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewHint: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.onSurfaceVariant,
+  },
+  appearanceScroll: {
+    flexGrow: 0,
+    marginBottom: SPACING.md,
+  },
+  swatchRow: {
+    gap: SPACING.sm,
+    paddingRight: SPACING.lg,
+  },
+  swatch: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.full,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  swatchSelected: {
+    borderWidth: 2,
+    borderColor: COLORS.onSurface,
+  },
+  iconRow: {
+    gap: SPACING.sm,
+    paddingRight: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  iconTile: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surfaceContainerLow,
+    borderWidth: 1,
+    borderColor: "transparent",
   },
 });
