@@ -48,6 +48,14 @@ export interface RunningTimer {
   timezone: string;
 }
 
+/** A time-of-day-aware activity recommendation for the idle TimerCard */
+export interface RecommendedActivity {
+  activityId: string;
+  activityName: string;
+  categoryName: string;
+  categoryColor: string;
+}
+
 /** A time entry as displayed on the timeline */
 export interface TimelineEntry {
   id: string;
