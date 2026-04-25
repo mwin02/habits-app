@@ -1,14 +1,7 @@
-import React, { useCallback } from "react";
-import {
-  ActionSheetIOS,
-  Alert,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import React, { useCallback, useRef } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { Swipeable, RectButton } from "react-native-gesture-handler";
 import type { ActivityItem } from "@/db/models";
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 
@@ -23,63 +16,57 @@ export function ManageActivityRow({
   onRename,
   onDelete,
 }: ManageActivityRowProps): React.ReactElement {
-  const openMenu = useCallback((): void => {
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ["Cancel", "Rename", "Delete"],
-          destructiveButtonIndex: 2,
-          cancelButtonIndex: 0,
-          title: activity.name,
-        },
-        (index) => {
-          if (index === 1) onRename(activity);
-          else if (index === 2) onDelete(activity);
-        },
-      );
-    } else {
-      Alert.alert(activity.name, undefined, [
-        { text: "Rename", onPress: () => onRename(activity) },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => onDelete(activity),
-        },
-        { text: "Cancel", style: "cancel" },
-      ]);
-    }
-  }, [activity, onRename, onDelete]);
+  const swipeableRef = useRef<Swipeable>(null);
+
+  const handleArchivePress = useCallback((): void => {
+    swipeableRef.current?.close();
+    onDelete(activity);
+  }, [activity, onDelete]);
+
+  const renderRightActions = useCallback(
+    (): React.ReactElement => (
+      <RectButton style={styles.archiveAction} onPress={handleArchivePress}>
+        <Feather name="archive" size={20} color={COLORS.onPrimary} />
+        <Text style={styles.archiveLabel}>Archive</Text>
+      </RectButton>
+    ),
+    [handleArchivePress],
+  );
 
   return (
-    <View style={styles.row}>
-      <View
-        style={[styles.dot, { backgroundColor: activity.categoryColor }]}
-      />
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
-          {activity.name}
-        </Text>
-        <Text
-          style={[styles.category, { color: activity.categoryColor }]}
-          numberOfLines={1}
-        >
-          {activity.categoryName}
-        </Text>
-      </View>
-      <Pressable
-        onPress={openMenu}
-        style={styles.menuButton}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityLabel={`Manage ${activity.name}`}
-      >
-        <Feather
-          name="more-horizontal"
-          size={20}
-          color={COLORS.onSurfaceVariant}
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      overshootRight={false}
+      friction={2}
+      rightThreshold={40}
+    >
+      <Pressable style={styles.row} onPress={() => onRename(activity)}>
+        <View
+          style={[styles.dot, { backgroundColor: activity.categoryColor }]}
         />
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>
+            {activity.name}
+          </Text>
+          <Text
+            style={[styles.category, { color: activity.categoryColor }]}
+            numberOfLines={1}
+          >
+            {activity.categoryName}
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => onRename(activity)}
+          style={styles.editButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Edit ${activity.name}`}
+        >
+          <Feather name="edit-2" size={16} color={COLORS.primary} />
+        </Pressable>
       </Pressable>
-    </View>
+    </Swipeable>
   );
 }
 
@@ -109,11 +96,27 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodySmall,
     marginTop: 2,
   },
-  menuButton: {
+  editButton: {
     width: 32,
     height: 32,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surfaceContainerLow,
+  },
+  archiveAction: {
+    backgroundColor: COLORS.error,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 100,
+    borderTopRightRadius: RADIUS.lg,
+    borderBottomRightRadius: RADIUS.lg,
+    marginLeft: SPACING.sm,
+    gap: 4,
+  },
+  archiveLabel: {
+    ...TYPOGRAPHY.labelUppercase,
+    color: COLORS.onPrimary,
+    fontSize: 11,
   },
 });
