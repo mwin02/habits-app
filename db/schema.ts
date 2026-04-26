@@ -56,7 +56,7 @@ const time_entries = new Table(
     duration_seconds: column.integer, // pre-computed on end for fast aggregation
     timezone: column.text,        // IANA timezone at creation (e.g. 'America/New_York')
     note: column.text,
-    source: column.text,          // 'timer' | 'manual' | 'retroactive' | 'import'
+    source: column.text,          // closed TS union: see TimeEntrySource in db/models.ts. All writes must go through TIME_ENTRY_SOURCES in db/queries/_helpers.ts.
     created_at: column.text,
     updated_at: column.text,
     deleted_at: column.text,
