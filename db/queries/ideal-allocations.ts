@@ -1,7 +1,7 @@
 import { db } from '@/lib/powersync';
 import { generateId } from '@/lib/uuid';
 import type { IdealAllocationRecord } from '../schema';
-import type { GoalDirection } from '../models';
+import type { GoalDirection, GoalPeriodKind } from '../models';
 import { nowUTC } from './_helpers';
 
 /**
@@ -14,13 +14,15 @@ export interface IdealAllocationRow {
   target_minutes_per_day: number;
   /** NULL in the DB for legacy rows — callers should treat it as 'around'. */
   goal_direction: GoalDirection | null;
+  /** NULL in the DB for legacy rows — callers should treat it as 'daily'. */
+  period_kind: GoalPeriodKind | null;
 }
 
 /**
  * SQL query for reactive ideal allocations (for useQuery).
  */
 export const IDEAL_ALLOCATIONS_QUERY = `
-  SELECT id, category_id, day_of_week, target_minutes_per_day, goal_direction
+  SELECT id, category_id, day_of_week, target_minutes_per_day, goal_direction, period_kind
   FROM ideal_allocations
   WHERE deleted_at IS NULL
 `;
@@ -44,43 +46,55 @@ export async function getIdealAllocationsForCategory(
 }
 
 /**
- * Upsert ideal allocation for (category, day_of_week).
- * `dayOfWeek`: 0=Mon … 6=Sun, or null for "every day".
+ * Upsert ideal allocation for (category, day_of_week, period_kind).
+ * `dayOfWeek`: 0=Mon … 6=Sun, or null for "every day". Ignored for weekly/monthly.
  * `goalDirection`: 'at_least' | 'at_most' | 'around'.
+ * `periodKind`: 'daily' | 'weekly' | 'monthly'. Defaults to 'daily'.
  */
 export async function setIdealAllocation(params: {
   categoryId: string;
   dayOfWeek: number | null;
   targetMinutesPerDay: number;
   goalDirection: GoalDirection;
+  periodKind?: GoalPeriodKind;
 }): Promise<void> {
   const now = nowUTC();
-  // SQLite: `day_of_week IS ?` treats NULL correctly when parameter is null.
+  const periodKind: GoalPeriodKind = params.periodKind ?? 'daily';
+  // Weekly/monthly rows are singletons per category — day_of_week is meaningless.
+  const dayOfWeek = periodKind === 'daily' ? params.dayOfWeek : null;
+
+  // SQLite: `IS ?` treats NULL correctly when parameter is null.
+  // Match on period_kind as well so a daily row and a weekly row for the same
+  // category never collide. Treat legacy NULL period_kind as 'daily'.
   const existing = await db.getOptional<IdealAllocationRecord>(
     `SELECT * FROM ideal_allocations
-     WHERE category_id = ? AND day_of_week IS ? AND deleted_at IS NULL`,
-    [params.categoryId, params.dayOfWeek]
+     WHERE category_id = ?
+       AND day_of_week IS ?
+       AND COALESCE(period_kind, 'daily') = ?
+       AND deleted_at IS NULL`,
+    [params.categoryId, dayOfWeek, periodKind]
   );
 
   if (existing) {
     await db.execute(
       `UPDATE ideal_allocations
-       SET target_minutes_per_day = ?, goal_direction = ?, updated_at = ?
+       SET target_minutes_per_day = ?, goal_direction = ?, period_kind = ?, updated_at = ?
        WHERE id = ?`,
-      [params.targetMinutesPerDay, params.goalDirection, now, existing.id]
+      [params.targetMinutesPerDay, params.goalDirection, periodKind, now, existing.id]
     );
   } else {
     const id = generateId();
     await db.execute(
       `INSERT INTO ideal_allocations
-         (id, user_id, category_id, day_of_week, target_minutes_per_day, goal_direction, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, ?, ?, ?, ?)`,
+         (id, user_id, category_id, day_of_week, target_minutes_per_day, goal_direction, period_kind, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         params.categoryId,
-        params.dayOfWeek,
+        dayOfWeek,
         params.targetMinutesPerDay,
         params.goalDirection,
+        periodKind,
         now,
         now,
       ]

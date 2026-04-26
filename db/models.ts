@@ -111,6 +111,16 @@ export interface TimelineGap {
  */
 export type GoalDirection = 'at_least' | 'at_most' | 'around';
 
+/**
+ * The cadence over which an ideal allocation is evaluated.
+ *  - 'daily'   → per-day target (with optional day_of_week overrides)
+ *  - 'weekly'  → single target summed across the whole week (day_of_week ignored)
+ *  - 'monthly' → single target summed across the whole month (day_of_week ignored)
+ *
+ * NULL in the DB is treated as 'daily' for legacy rows.
+ */
+export type GoalPeriodKind = 'daily' | 'weekly' | 'monthly';
+
 /** Insight data for a single category */
 export interface CategoryInsight {
   categoryId: string;
@@ -121,6 +131,8 @@ export interface CategoryInsight {
   differenceMinutes: number | null;
   /** null when the category has no goal. */
   goalDirection: GoalDirection | null;
+  /** null when the category has no goal. */
+  goalPeriodKind: GoalPeriodKind | null;
 }
 
 /** Daily coverage stats */
