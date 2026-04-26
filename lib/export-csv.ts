@@ -70,7 +70,7 @@ function buildFilename(now: Date): string {
   const stamp =
     `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
     `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  return `habits-time-entries-${stamp}.csv`;
+  return `horae-time-entries-${stamp}.csv`;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { column, Schema, Table } from '@powersync/react-native';
 
 /**
- * PowerSync schema for the Habits time-tracking app.
+ * PowerSync schema for the Horae time-tracking app.
  *
  * All tables are localOnly for now — no sync to Supabase yet.
  * When we add sync (Phase 3), we'll remove localOnly and connect

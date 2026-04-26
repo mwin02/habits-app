@@ -70,20 +70,20 @@ export default function RootLayout() {
   useEffect(() => {
     async function initDB() {
       try {
-        console.log("[Habits] Starting DB init...");
+        console.log("[Horae] Starting DB init...");
         await db.init();
-        console.log("[Habits] DB init complete, seeding...");
+        console.log("[Horae] DB init complete, seeding...");
         await seedPresetsIfNeeded();
         await seedNotificationPreferencesIfNeeded();
         await seedUserPreferencesIfNeeded();
-        console.log("[Habits] Seed complete");
+        console.log("[Horae] Seed complete");
       } catch (e) {
-        console.error("[Habits] DB init failed:", e);
+        console.error("[Horae] DB init failed:", e);
       } finally {
         setDbReady(true);
       }
     }
-    console.log("[Habits] useEffect fired");
+    console.log("[Horae] useEffect fired");
     initDB();
   }, []);
 

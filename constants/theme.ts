@@ -1,5 +1,5 @@
 /**
- * Design system tokens for the "Fluid Chronometer" design.
+ * Design system tokens for the "Fluid Chronometer" design (Horae).
  * Single source of truth for colors, typography, spacing, and radii.
  */
 

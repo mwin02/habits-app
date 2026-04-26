@@ -105,7 +105,7 @@ export default function HomeScreen(): React.ReactElement {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <Text style={styles.title}>Chronometer</Text>
+        <Text style={styles.title}>Horae</Text>
 
         {/* Timer Card */}
         <View style={styles.timerCardWrapper}>

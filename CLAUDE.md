@@ -1,4 +1,4 @@
-# Habits App — Claude Code Guide
+# Horae — Claude Code Guide
 
 ## Project Overview
 
@@ -46,7 +46,7 @@ Full implementation plan: `/Users/myozawwin/.claude/plans/ethereal-percolating-c
 ## Project Structure
 
 ```
-habits-app/
+horae/
 ├── app/                    # Expo Router screens (file-based routing)
 │   ├── (tabs)/             # Tab navigator
 │   │   ├── index.tsx       # Home/Timer tab

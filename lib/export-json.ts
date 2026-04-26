@@ -81,7 +81,7 @@ function buildFilename(now: Date): string {
   const stamp =
     `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}` +
     `-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  return `habits-export-${stamp}.json`;
+  return `horae-export-${stamp}.json`;
 }
 
 /**
@@ -109,6 +109,6 @@ export async function exportDataAsJson(): Promise<void> {
   await Sharing.shareAsync(file.uri, {
     mimeType: "application/json",
     UTI: "public.json",
-    dialogTitle: "Export Habits data",
+    dialogTitle: "Export Horae data",
   });
 }
