@@ -10,48 +10,45 @@ import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { useInsightsData, type InsightsPeriod } from "@/hooks/useInsightsData";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { getCurrentTimezone, getTodayDate } from "@/lib/timezone";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function InsightsScreen(): React.ReactElement {
   const today = getTodayDate(getCurrentTimezone());
-  const { preferences } = useUserPreferences();
-  const [period, setPeriod] = useState<InsightsPeriod>(
-    preferences.defaultInsightsPeriod,
-  );
-  // Apply the user's default period exactly once after prefs first load,
-  // then leave the user free to flip the toggle without it snapping back.
-  const didSyncDefaultRef = useRef(false);
+  const { preferences, isLoading: prefsLoading } = useUserPreferences();
+  // `null` means "haven't applied the user's default yet". Once prefs finish
+  // loading we hydrate from `defaultInsightsPeriod`; from then on the value
+  // is whatever the user toggles to (no snap-back to the saved default).
+  const [period, setPeriod] = useState<InsightsPeriod | null>(null);
   useEffect(() => {
-    if (didSyncDefaultRef.current) return;
-    didSyncDefaultRef.current = true;
-    if (preferences.defaultInsightsPeriod !== period) {
-      setPeriod(preferences.defaultInsightsPeriod);
-    }
-  }, [preferences.defaultInsightsPeriod, period]);
+    if (prefsLoading || period !== null) return;
+    setPeriod(preferences.defaultInsightsPeriod);
+  }, [prefsLoading, preferences.defaultInsightsPeriod, period]);
+  const effectivePeriod: InsightsPeriod =
+    period ?? preferences.defaultInsightsPeriod;
   const [dailyDate, setDailyDate] = useState<string>(today);
   const [weeklyDate, setWeeklyDate] = useState<string>(today);
   const [monthlyDate, setMonthlyDate] = useState<string>(today);
 
   const activeDate =
-    period === "daily"
+    effectivePeriod === "daily"
       ? dailyDate
-      : period === "weekly"
+      : effectivePeriod === "weekly"
         ? weeklyDate
         : monthlyDate;
   const { categoryInsights, coverage, totalTrackedMinutes, isLoading } =
-    useInsightsData(activeDate, period);
+    useInsightsData(activeDate, effectivePeriod);
 
   const isEmpty = !isLoading && categoryInsights.length === 0;
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <PeriodToggle period={period} onPeriodChange={setPeriod} />
+      <PeriodToggle period={effectivePeriod} onPeriodChange={setPeriod} />
 
-      {period === "daily" ? (
+      {effectivePeriod === "daily" ? (
         <DateHeader selectedDate={dailyDate} onDateChange={setDailyDate} />
-      ) : period === "weekly" ? (
+      ) : effectivePeriod === "weekly" ? (
         <WeekNavHeader selectedDate={weeklyDate} onDateChange={setWeeklyDate} />
       ) : (
         <MonthNavHeader
@@ -64,7 +61,7 @@ export default function InsightsScreen(): React.ReactElement {
         <ActivityIndicator style={styles.loader} color={COLORS.primary} />
       ) : isEmpty ? (
         <>
-          {period === "daily" && (
+          {effectivePeriod === "daily" && (
             <WeekStrip selectedDate={dailyDate} onDateChange={setDailyDate} />
           )}
           <View style={styles.emptyContainer}>
@@ -74,7 +71,7 @@ export default function InsightsScreen(): React.ReactElement {
             </Text>
           </View>
         </>
-      ) : period === "daily" ? (
+      ) : effectivePeriod === "daily" ? (
         <DailyInsightsView
           selectedDate={dailyDate}
           onDateChange={setDailyDate}
@@ -82,7 +79,7 @@ export default function InsightsScreen(): React.ReactElement {
           coverage={coverage}
           totalTrackedMinutes={totalTrackedMinutes}
         />
-      ) : period === "weekly" ? (
+      ) : effectivePeriod === "weekly" ? (
         <WeeklyInsightsView
           selectedDate={weeklyDate}
           categoryInsights={categoryInsights}
