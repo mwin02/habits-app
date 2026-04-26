@@ -1,7 +1,7 @@
 import { db } from '@/lib/powersync';
 import { generateId } from '@/lib/uuid';
-import type { TimeEntryRecord } from '../schema';
-import { nowUTC } from './_helpers';
+import type { TimeEntryRecord } from '../models';
+import { TIME_ENTRY_SOURCES, assertTimeEntrySource, nowUTC } from './_helpers';
 
 /** Get the currently running time entry (if any) */
 export async function getRunningEntry(): Promise<TimeEntryRecord | null> {
@@ -24,6 +24,7 @@ export async function startEntry(params: {
 }): Promise<string> {
   const id = generateId();
   const now = nowUTC();
+  const source = assertTimeEntrySource(TIME_ENTRY_SOURCES.timer);
   const tagIds = params.tagIds && params.tagIds.length > 0
     ? Array.from(new Set(params.tagIds))
     : null;
@@ -32,8 +33,8 @@ export async function startEntry(params: {
     await db.writeTransaction(async (tx) => {
       await tx.execute(
         `INSERT INTO time_entries (id, user_id, activity_id, started_at, ended_at, duration_seconds, timezone, note, source, created_at, updated_at)
-         VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, 'timer', ?, ?)`,
-        [id, params.activityId, now, params.timezone, now, now]
+         VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, ?, ?, ?)`,
+        [id, params.activityId, now, params.timezone, source, now, now]
       );
       for (const tagId of tagIds) {
         await tx.execute(
@@ -46,8 +47,8 @@ export async function startEntry(params: {
   } else {
     await db.execute(
       `INSERT INTO time_entries (id, user_id, activity_id, started_at, ended_at, duration_seconds, timezone, note, source, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, 'timer', ?, ?)`,
-      [id, params.activityId, now, params.timezone, now, now]
+       VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, ?, ?, ?)`,
+      [id, params.activityId, now, params.timezone, source, now, now]
     );
   }
   return id;
@@ -91,10 +92,11 @@ export async function switchEntry(params: {
     );
 
     // Start new entry
+    const source = assertTimeEntrySource(TIME_ENTRY_SOURCES.timer);
     await tx.execute(
       `INSERT INTO time_entries (id, user_id, activity_id, started_at, ended_at, duration_seconds, timezone, note, source, created_at, updated_at)
-       VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, 'timer', ?, ?)`,
-      [newId, params.newActivityId, now, params.timezone, now, now]
+       VALUES (?, NULL, ?, ?, NULL, NULL, ?, NULL, ?, ?, ?)`,
+      [newId, params.newActivityId, now, params.timezone, source, now, now]
     );
   });
 
@@ -131,10 +133,11 @@ export async function createRetroactiveEntry(params: {
     (params.endedAt.getTime() - params.startedAt.getTime()) / 1000
   );
 
+  const source = assertTimeEntrySource(TIME_ENTRY_SOURCES.retroactive);
   await db.execute(
     `INSERT INTO time_entries (id, user_id, activity_id, started_at, ended_at, duration_seconds, timezone, note, source, created_at, updated_at)
-     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 'retroactive', ?, ?)`,
-    [id, params.activityId, startStr, endStr, durationSeconds, params.timezone, params.note ?? null, now, now]
+     VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, params.activityId, startStr, endStr, durationSeconds, params.timezone, params.note ?? null, source, now, now]
   );
   return id;
 }

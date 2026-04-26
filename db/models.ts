@@ -11,8 +11,19 @@ export type {
   EntryTagRecord,
   IdealAllocationRecord,
   TagRecord,
-  TimeEntryRecord,
 } from "./schema";
+
+import type { TimeEntryRecord as RawTimeEntryRecord } from "./schema";
+
+/**
+ * `TimeEntryRecord` with `source` narrowed to the closed `TimeEntrySource`
+ * union. The DB stores it as free text, but every write site must go through
+ * the typed helpers in `db/queries/_helpers.ts`, so reads can rely on the
+ * narrowed type.
+ */
+export type TimeEntryRecord = Omit<RawTimeEntryRecord, "source"> & {
+  source: TimeEntrySource | null;
+};
 
 /** A tag as displayed in the UI */
 export interface TagItem {

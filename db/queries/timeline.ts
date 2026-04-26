@@ -1,3 +1,5 @@
+import type { TimeEntrySource } from '../models';
+
 /** Row shape returned by the timeline detail query */
 export interface TimelineEntryRow {
   entry_id: string;
@@ -7,7 +9,7 @@ export interface TimelineEntryRow {
   duration_seconds: number | null;
   timezone: string;
   note: string | null;
-  source: string;
+  source: TimeEntrySource;
   activity_name: string;
   category_name: string;
   category_color: string;

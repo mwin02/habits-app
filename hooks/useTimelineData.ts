@@ -1,4 +1,4 @@
-import type { TimeEntrySource, TimelineEntry, TimelineGap } from "@/db/models";
+import type { TimelineEntry, TimelineGap } from "@/db/models";
 import {
   ENTRY_TAGS_BY_RANGE_QUERY,
   TIMELINE_ENTRIES_QUERY,
@@ -350,7 +350,7 @@ export function useTimelineData(
         isRunning,
         durationSeconds,
         note: row.note,
-        source: row.source as TimeEntrySource,
+        source: row.source,
         timezone: row.timezone,
         continuesBefore,
         continuesAfter,
