@@ -363,18 +363,30 @@ export function TimelineCanvas({
   // focus (covers initial mount and tab switches). Defer to the next frame so
   // the canvas has laid out before we scroll — otherwise the ScrollView clamps
   // against a stale content height and the position visibly corrects itself.
+  // Latest nowTop accessed via ref so the focus-effect callback identity stays
+  // stable across the 1s tick — otherwise it would cleanup+rerun every second
+  // while focused and hijack the user's scroll.
+  const nowTopRef = useRef(nowTop);
+  nowTopRef.current = nowTop;
+
   useFocusEffect(
     useCallback(() => {
-      if (!isToday || nowTop < 0) return;
+      if (!isToday) return;
       if (hasAutoScrolledRef.current === selectedDate) return;
+      const nt = nowTopRef.current;
+      if (nt < 0) return;
       const viewportHeight = Dimensions.get("window").height;
-      const target = Math.max(0, nowTop - viewportHeight / 3);
+      const target = Math.max(0, nt - viewportHeight / 3);
       const raf = requestAnimationFrame(() => {
         scrollRef.current?.scrollTo({ y: target, animated: false });
         hasAutoScrolledRef.current = selectedDate;
       });
-      return () => cancelAnimationFrame(raf);
-    }, [isToday, nowTop, selectedDate]),
+      return () => {
+        cancelAnimationFrame(raf);
+        // Clear guard on blur so the next focus re-centers on now.
+        hasAutoScrolledRef.current = null;
+      };
+    }, [isToday, selectedDate]),
   );
 
   return (
