@@ -10,6 +10,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { NOTIFICATION_PREFERENCES_QUERY } from "@/db/queries";
 import type { NotificationPreferencesRecord } from "@/db/schema";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { exportTimeEntriesAsCsv } from "@/lib/export-csv";
 import { exportDataAsJson } from "@/lib/export-json";
 
 const WEEK_START_LABELS: Record<number, string> = {
@@ -61,6 +62,7 @@ export default function SettingsScreen(): React.ReactElement {
   const prefs = prefsData.length > 0 ? prefsData[0] : null;
   const { preferences } = useUserPreferences();
   const [isExportingJson, setIsExportingJson] = useState(false);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
 
   const handleExportJson = useCallback(async () => {
     if (isExportingJson) return;
@@ -75,6 +77,20 @@ export default function SettingsScreen(): React.ReactElement {
       setIsExportingJson(false);
     }
   }, [isExportingJson]);
+
+  const handleExportCsv = useCallback(async () => {
+    if (isExportingCsv) return;
+    setIsExportingCsv(true);
+    try {
+      await exportTimeEntriesAsCsv();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown error";
+      Alert.alert("Export failed", message);
+    } finally {
+      setIsExportingCsv(false);
+    }
+  }, [isExportingCsv]);
 
   const goToGeneralPreferences = useCallback(() => {
     router.push("/general-preferences");
@@ -184,6 +200,20 @@ export default function SettingsScreen(): React.ReactElement {
           iconBackground={COLORS.surfaceContainer}
           iconChildren={
             <Feather name="download" size={20} color={COLORS.primary} />
+          }
+        />
+        <SettingRow
+          title="Export time entries (CSV)"
+          description={
+            isExportingCsv
+              ? "Preparing export…"
+              : "Spreadsheet-friendly: one row per tracked entry"
+          }
+          onPress={handleExportCsv}
+          disabled={isExportingCsv}
+          iconBackground={COLORS.surfaceContainer}
+          iconChildren={
+            <Feather name="file-text" size={20} color={COLORS.primary} />
           }
         />
       </ScrollView>
