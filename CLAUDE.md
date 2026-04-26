@@ -112,17 +112,8 @@ All tables have `updated_at`, `deleted_at` (soft delete) columns. All tables are
 ## Development Commands
 
 ```bash
-# Run on iOS simulator (REQUIRED — Expo Go won't work with PowerSync/JSI)
-npx expo run:ios
-
-# Run on Android emulator
-npx expo run:android
-
 # Type check
 npx tsc --noEmit
-
-# Start Metro bundler separately (if needed)
-npx expo start --clear
 ```
 
 ## Coding Conventions
@@ -140,10 +131,6 @@ npx expo start --clear
 
 ## Common Patterns
 
-### Quick-switch
-
-One tap stops current activity and starts new one. No confirmation modal. Show toast.
-
 ### Notifications
 
 - `useNotificationScheduler` is **mounted once at the root** and is purely **reactive** — it watches the running-entry query + `notification_preferences` and never gets called imperatively from `useTimer`. Every code path that mutates `time_entries` is automatically covered.
@@ -155,11 +142,6 @@ One tap stops current activity and starts new one. No confirmation modal. Show t
 
 - **All writes go through `TIME_ENTRY_SOURCES` + `assertTimeEntrySource`** from `db/queries/_helpers.ts`. Never inline a string literal in an INSERT — bind a typed const instead. The `__DEV__`-only assert catches stray values in development.
 - **Reads can trust the union.** `TimeEntryRecord.source` is narrowed to `TimeEntrySource | null` in `db/models.ts`, so analytics SQL (`source IN ('timer','manual')` in `notifications.ts`) and downstream Insights queries can rely on a fixed alphabet.
-- **Why this matters pre-sync:** once Phase 3 lands, rows from many devices land in Supabase. A free-text `source` column lets a future contributor write `'csv'` / `'imported_from_csv'` / `'csv-import'` and silently break aggregations and sync rules. To add a new source value, extend the union in `db/models.ts` *and* `TIME_ENTRY_SOURCES` together — TS will fail compile if they drift (the `satisfies Record<TimeEntrySource, TimeEntrySource>` guard).
-
-### Forgotten stop detection
-
-On app foreground, check for `time_entries` where `ended_at IS NULL`. If found and stale (>2h or different day), show bottom sheet.
 
 ### Reusable UI Components (`components/common/`)
 
@@ -218,7 +200,6 @@ On app foreground, check for `time_entries` where `ended_at IS NULL`. If found a
 - **Phase 1, Step 3:** Home/Timer tab — TimerCard (active/idle with consistent height), QuickSwitchSection (horizontal carousel), NewSessionModal (category filter, search, activity picker), tab layout with Feather icons
 - **Phase 1, Step 4:** Forgotten stop modal (bottom sheet with time picker)
 - **Phase 2, Step 5:** Timeline tab — vertical day timeline with time axis, entry blocks, gap blocks, clustering of short entries, overlap detection (side-by-side layout), current time indicator, date navigation (DateHeader + WeekStrip), EntryDetailModal (time editing + delete), GapFillModal (activity picker with adjustable times)
-
 - **Phase 2, Step 6:** Insights tab — Daily/Weekly toggle, category breakdown bars, actual vs ideal comparison, activity breakdown with SVG donut chart and category selector, tracking coverage card
 
 ### Next Up
