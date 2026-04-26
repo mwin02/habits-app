@@ -16,3 +16,4 @@ export * from './queries/ideal-allocations';
 export * from './queries/notifications';
 export * from './queries/tags';
 export * from './queries/user-preferences';
+export * from './queries/data-management';
