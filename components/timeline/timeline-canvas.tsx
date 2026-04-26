@@ -352,25 +352,6 @@ export function TimelineCanvas({
     return null;
   }, [items, isToday]);
 
-  const handleContentSizeChange = useCallback(
-    (_w: number, contentHeight: number) => {
-      if (!isToday) return;
-      if (hasAutoScrolledRef.current === selectedDate) return;
-      if (nowTop < 0) return;
-      const viewportHeight = Dimensions.get("window").height;
-      const target = Math.max(
-        0,
-        Math.min(
-          nowTop - viewportHeight / 3,
-          contentHeight - viewportHeight,
-        ),
-      );
-      scrollRef.current?.scrollTo({ y: target, animated: false });
-      hasAutoScrolledRef.current = selectedDate;
-    },
-    [isToday, selectedDate, nowTop],
-  );
-
   // Reset autoscroll guard when navigating between dates so returning to today re-centers.
   useEffect(() => {
     if (hasAutoScrolledRef.current !== selectedDate) {
@@ -378,28 +359,27 @@ export function TimelineCanvas({
     }
   }, [selectedDate]);
 
-  // Re-center on the now-indicator each time the tab gains focus (Expo Router
-  // keeps tabs mounted, so onContentSizeChange won't refire on tab switch).
+  // Single autoscroll path: re-center on the now-indicator when the tab gains
+  // focus (covers initial mount and tab switches). Defer to the next frame so
+  // the canvas has laid out before we scroll — otherwise the ScrollView clamps
+  // against a stale content height and the position visibly corrects itself.
   useFocusEffect(
     useCallback(() => {
       if (!isToday || nowTop < 0) return;
+      if (hasAutoScrolledRef.current === selectedDate) return;
       const viewportHeight = Dimensions.get("window").height;
-      const target = Math.max(
-        0,
-        Math.min(
-          nowTop - viewportHeight / 3,
-          resolvedCanvasHeight - viewportHeight,
-        ),
-      );
-      scrollRef.current?.scrollTo({ y: target, animated: false });
-      hasAutoScrolledRef.current = selectedDate;
-    }, [isToday, nowTop, resolvedCanvasHeight, selectedDate]),
+      const target = Math.max(0, nowTop - viewportHeight / 3);
+      const raf = requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({ y: target, animated: false });
+        hasAutoScrolledRef.current = selectedDate;
+      });
+      return () => cancelAnimationFrame(raf);
+    }, [isToday, nowTop, selectedDate]),
   );
 
   return (
     <ScrollView
       ref={scrollRef}
-      onContentSizeChange={handleContentSizeChange}
       contentContainerStyle={[
         styles.scrollContent,
         { height: resolvedCanvasHeight + SPACING["5xl"] },
