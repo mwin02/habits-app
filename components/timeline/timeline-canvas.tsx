@@ -4,6 +4,7 @@ import {
   minutesSinceMidnight,
 } from "@/hooks/useTimelineData";
 import { getCurrentTimezone, getTodayDate } from "@/lib/timezone";
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ACTIVE_CHIP_HEIGHT, ActiveSessionChip } from "./active-session-chip";
@@ -376,6 +377,24 @@ export function TimelineCanvas({
       hasAutoScrolledRef.current = null;
     }
   }, [selectedDate]);
+
+  // Re-center on the now-indicator each time the tab gains focus (Expo Router
+  // keeps tabs mounted, so onContentSizeChange won't refire on tab switch).
+  useFocusEffect(
+    useCallback(() => {
+      if (!isToday || nowTop < 0) return;
+      const viewportHeight = Dimensions.get("window").height;
+      const target = Math.max(
+        0,
+        Math.min(
+          nowTop - viewportHeight / 3,
+          resolvedCanvasHeight - viewportHeight,
+        ),
+      );
+      scrollRef.current?.scrollTo({ y: target, animated: false });
+      hasAutoScrolledRef.current = selectedDate;
+    }, [isToday, nowTop, resolvedCanvasHeight, selectedDate]),
+  );
 
   return (
     <ScrollView
