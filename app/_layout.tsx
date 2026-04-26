@@ -159,6 +159,14 @@ function RootLayoutNav() {
               headerTitle: "",
             }}
           />
+          <Stack.Screen
+            name="manage-data"
+            options={{
+              title: "Manage data",
+              headerBackTitle: "Back",
+              headerTitle: "",
+            }}
+          />
         </Stack>
       </ThemeProvider>
     </PowerSyncContext.Provider>
