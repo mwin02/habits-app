@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@powersync/react";
 
-import type { GoalDirection } from "@/db/models";
+import type { GoalDirection, GoalPeriodKind } from "@/db/models";
 import {
   IDEAL_ALLOCATIONS_QUERY,
   type IdealAllocationRow,
@@ -37,7 +37,10 @@ export function useAllCategoryGoalSummaries(): UseAllCategoryGoalSummariesResult
     type Entry = {
       defaultVal: number | null;
       perDay: (number | null)[];
+      weekly: number | null;
+      monthly: number | null;
       directions: GoalDirection[];
+      kinds: Set<GoalPeriodKind>;
     };
     const byCategory = new Map<string, Entry>();
     for (const row of rows) {
@@ -46,14 +49,25 @@ export function useAllCategoryGoalSummaries(): UseAllCategoryGoalSummariesResult
         entry = {
           defaultVal: null,
           perDay: [null, null, null, null, null, null, null],
+          weekly: null,
+          monthly: null,
           directions: [],
+          kinds: new Set(),
         };
         byCategory.set(row.category_id, entry);
       }
-      if (row.day_of_week == null) {
-        entry.defaultVal = row.target_minutes_per_day;
-      } else if (row.day_of_week >= 0 && row.day_of_week <= 6) {
-        entry.perDay[row.day_of_week] = row.target_minutes_per_day;
+      const kind: GoalPeriodKind = row.period_kind ?? "daily";
+      entry.kinds.add(kind);
+      if (kind === "weekly") {
+        entry.weekly = row.target_minutes_per_day;
+      } else if (kind === "monthly") {
+        entry.monthly = row.target_minutes_per_day;
+      } else {
+        if (row.day_of_week == null) {
+          entry.defaultVal = row.target_minutes_per_day;
+        } else if (row.day_of_week >= 0 && row.day_of_week <= 6) {
+          entry.perDay[row.day_of_week] = row.target_minutes_per_day;
+        }
       }
       if (row.goal_direction != null) entry.directions.push(row.goal_direction);
     }
@@ -61,10 +75,17 @@ export function useAllCategoryGoalSummaries(): UseAllCategoryGoalSummariesResult
     const result = new Map<string, CategoryGoalSummary>();
     for (const [categoryId, entry] of byCategory) {
       const direction = resolveDirection(entry.directions);
-      result.set(
-        categoryId,
-        summarise(entry.defaultVal, entry.perDay, direction),
-      );
+      // Period kind precedence mirrors useInsightsData.resolveKind.
+      if (entry.kinds.has("weekly") && entry.weekly != null) {
+        result.set(categoryId, summarisePeriod(entry.weekly, "weekly", direction));
+      } else if (entry.kinds.has("monthly") && entry.monthly != null) {
+        result.set(categoryId, summarisePeriod(entry.monthly, "monthly", direction));
+      } else {
+        result.set(
+          categoryId,
+          summarise(entry.defaultVal, entry.perDay, direction),
+        );
+      }
     }
     return result;
   }, [rows]);
@@ -130,6 +151,19 @@ function summarise(
   }
 
   return { hasGoal: true, label: `${prefix}Custom schedule` };
+}
+
+function summarisePeriod(
+  minutes: number,
+  kind: "weekly" | "monthly",
+  direction: GoalDirection,
+): CategoryGoalSummary {
+  const prefix = directionPrefix(direction);
+  const cadence = kind === "weekly" ? "weekly" : "monthly";
+  if (minutes === 0) {
+    return { hasGoal: true, label: `Off ${cadence}` };
+  }
+  return { hasGoal: true, label: `${prefix}${fmt(minutes)} ${cadence}` };
 }
 
 function fmt(minutes: number): string {

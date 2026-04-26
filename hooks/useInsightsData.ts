@@ -1,4 +1,9 @@
-import type { CategoryInsight, DayCoverage, GoalDirection } from "@/db/models";
+import type {
+  CategoryInsight,
+  DayCoverage,
+  GoalDirection,
+  GoalPeriodKind,
+} from "@/db/models";
 import {
   IDEAL_ALLOCATIONS_QUERY,
   INSIGHTS_CATEGORY_QUERY,
@@ -195,13 +200,17 @@ export function useInsightsData(
 
   // Combine into CategoryInsight[] and DayCoverage
   const result = useMemo(() => {
-    // Build per-category lookup keyed by day_of_week (0-6) with a `null` slot
-    // for the "every day" default. Track each row's direction so we can
-    // surface it on the CategoryInsight.
+    // Build per-category lookup. Daily rows fill `default` + `perDay`;
+    // weekly/monthly rows are singletons (one target across the period).
+    // The editor enforces a single kind per category, but at read time we
+    // tolerate mixed rows by routing each row to its own kind.
     type Targets = {
       default: number | null;
       perDay: (number | null)[];
+      weekly: number | null;
+      monthly: number | null;
       directions: GoalDirection[]; // all non-null directions seen for the category
+      kinds: Set<GoalPeriodKind>;
     };
     const byCategory = new Map<string, Targets>();
     for (const row of allocationRows) {
@@ -210,14 +219,25 @@ export function useInsightsData(
         entry = {
           default: null,
           perDay: [null, null, null, null, null, null, null],
+          weekly: null,
+          monthly: null,
           directions: [],
+          kinds: new Set(),
         };
         byCategory.set(row.category_id, entry);
       }
-      if (row.day_of_week == null) {
-        entry.default = row.target_minutes_per_day;
-      } else if (row.day_of_week >= 0 && row.day_of_week <= 6) {
-        entry.perDay[row.day_of_week] = row.target_minutes_per_day;
+      const kind: GoalPeriodKind = row.period_kind ?? "daily";
+      entry.kinds.add(kind);
+      if (kind === "weekly") {
+        entry.weekly = row.target_minutes_per_day;
+      } else if (kind === "monthly") {
+        entry.monthly = row.target_minutes_per_day;
+      } else {
+        if (row.day_of_week == null) {
+          entry.default = row.target_minutes_per_day;
+        } else if (row.day_of_week >= 0 && row.day_of_week <= 6) {
+          entry.perDay[row.day_of_week] = row.target_minutes_per_day;
+        }
       }
       if (row.goal_direction != null) {
         entry.directions.push(row.goal_direction);
@@ -227,21 +247,49 @@ export function useInsightsData(
     // Precompute the weekday index of each day in range.
     const weekdays = daysInRange.map(weekdayMondayZero);
 
-    /** Sum target minutes for a category across daysInRange. Returns null when
-     *  there is no allocation of any kind for the category. */
-    const computeTarget = (categoryId: string): number | null => {
-      const entry = byCategory.get(categoryId);
-      if (!entry) return null;
-      const hasAny =
+    /** A category's effective goal kind: weekly/monthly take precedence over
+     *  daily so that opting into a period goal isn't masked by a stale daily
+     *  row. */
+    const resolveKind = (entry: Targets): GoalPeriodKind | null => {
+      if (entry.kinds.has("weekly") && entry.weekly != null) return "weekly";
+      if (entry.kinds.has("monthly") && entry.monthly != null) return "monthly";
+      const hasDaily =
         entry.default != null || entry.perDay.some((v) => v != null);
-      if (!hasAny) return null;
-      let total = 0;
-      for (const wd of weekdays) {
-        const override = entry.perDay[wd];
-        const value = override != null ? override : entry.default;
-        if (value != null) total += value;
+      return hasDaily ? "daily" : null;
+    };
+
+    /** Compute target minutes for a category given its goal kind and the
+     *  current view period. Returns null when the goal cadence doesn't line
+     *  up with the view (e.g. weekly goal viewed daily) — that prevents
+     *  bogus "missed today" signals on legitimate off-days. */
+    const computeTarget = (
+      categoryId: string,
+    ): { target: number | null; kind: GoalPeriodKind | null } => {
+      const entry = byCategory.get(categoryId);
+      if (!entry) return { target: null, kind: null };
+      const kind = resolveKind(entry);
+      if (kind == null) return { target: null, kind: null };
+
+      if (kind === "daily") {
+        let total = 0;
+        for (const wd of weekdays) {
+          const override = entry.perDay[wd];
+          const value = override != null ? override : entry.default;
+          if (value != null) total += value;
+        }
+        return { target: total, kind };
       }
-      return total;
+
+      // Weekly/monthly goals only render a target when the view period
+      // matches the goal cadence. Otherwise return null target but still
+      // surface the kind so callers know the goal exists.
+      if (kind === "weekly" && period === "weekly") {
+        return { target: entry.weekly, kind };
+      }
+      if (kind === "monthly" && period === "monthly") {
+        return { target: entry.monthly, kind };
+      }
+      return { target: null, kind };
     };
 
     /** Pick a single direction for the category. The editor keeps all rows
@@ -260,7 +308,9 @@ export function useInsightsData(
       const actualMinutes = Math.round(row.total_seconds / 60);
       totalTrackedMinutes += actualMinutes;
 
-      const targetMinutes = computeTarget(row.category_id);
+      const { target: targetMinutes, kind: goalPeriodKind } = computeTarget(
+        row.category_id,
+      );
       const differenceMinutes =
         targetMinutes != null ? actualMinutes - targetMinutes : null;
       const goalDirection =
@@ -276,6 +326,7 @@ export function useInsightsData(
         targetMinutes,
         differenceMinutes,
         goalDirection,
+        goalPeriodKind,
       };
     });
 
@@ -292,7 +343,7 @@ export function useInsightsData(
     };
 
     return { categoryInsights, coverage, totalTrackedMinutes };
-  }, [categoryRows, allocationRows, daysInRange, numDays, selectedDate]);
+  }, [categoryRows, allocationRows, daysInRange, numDays, selectedDate, period]);
 
   return {
     categoryInsights: result.categoryInsights,

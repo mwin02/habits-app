@@ -80,6 +80,9 @@ const ideal_allocations = new Table(
     target_minutes_per_day: column.integer,
     // 'at_least' | 'at_most' | 'around'. NULL = 'around' (legacy rows).
     goal_direction: column.text,
+    // 'daily' | 'weekly' | 'monthly'. NULL = 'daily' (legacy rows).
+    // Weekly/monthly rows ignore day_of_week and target the period total.
+    period_kind: column.text,
     created_at: column.text,
     updated_at: column.text,
     deleted_at: column.text,
