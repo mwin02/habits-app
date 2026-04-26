@@ -15,3 +15,4 @@ export * from './queries/recommendations';
 export * from './queries/ideal-allocations';
 export * from './queries/notifications';
 export * from './queries/tags';
+export * from './queries/user-preferences';

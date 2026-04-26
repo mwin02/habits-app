@@ -25,7 +25,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/components/useColorScheme";
-import { seedNotificationPreferencesIfNeeded, seedPresetsIfNeeded } from "@/db/seed";
+import {
+  seedNotificationPreferencesIfNeeded,
+  seedPresetsIfNeeded,
+  seedUserPreferencesIfNeeded,
+} from "@/db/seed";
 import { useNotificationScheduler } from "@/hooks/useNotificationScheduler";
 import { db } from "@/lib/powersync";
 
@@ -71,6 +75,7 @@ export default function RootLayout() {
         console.log("[Habits] DB init complete, seeding...");
         await seedPresetsIfNeeded();
         await seedNotificationPreferencesIfNeeded();
+        await seedUserPreferencesIfNeeded();
         console.log("[Habits] Seed complete");
       } catch (e) {
         console.error("[Habits] DB init failed:", e);

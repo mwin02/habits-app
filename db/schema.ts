@@ -142,6 +142,23 @@ const entry_tags = new Table(
   }
 );
 
+// Singleton row of general user-scoped preferences. Notification prefs live
+// in their own table — keep this one for non-notification settings so it
+// doesn't grow into a kitchen sink. NULL columns mean "use default" so
+// pre-table-write rows stay sensible.
+const user_preferences = new Table(
+  {
+    user_id: column.text,
+    week_start_day: column.integer,        // 0=Mon … 6=Sun. NULL = 0/Mon (legacy).
+    default_insights_period: column.text,  // 'daily' | 'weekly' | 'monthly'. NULL = 'daily'.
+    default_timezone: column.text,         // IANA tz string. NULL = device tz.
+    created_at: column.text,
+    updated_at: column.text,
+    deleted_at: column.text,
+  },
+  { localOnly: true }
+);
+
 const daily_summaries = new Table(
   {
     user_id: column.text,
@@ -162,6 +179,7 @@ export const AppSchema = new Schema({
   notification_preferences,
   tags,
   entry_tags,
+  user_preferences,
   daily_summaries,
 });
 
@@ -173,4 +191,5 @@ export type IdealAllocationRecord = Database['ideal_allocations'];
 export type NotificationPreferencesRecord = Database['notification_preferences'];
 export type TagRecord = Database['tags'];
 export type EntryTagRecord = Database['entry_tags'];
+export type UserPreferencesRecord = Database['user_preferences'];
 export type DailySummaryRecord = Database['daily_summaries'];

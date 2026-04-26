@@ -1,6 +1,10 @@
 import { db } from '@/lib/powersync';
 import { generateId } from '@/lib/uuid';
 import { PRESET_CATEGORIES } from '@/constants/presets';
+import {
+  DEFAULT_INSIGHTS_PERIOD,
+  DEFAULT_WEEK_START_DAY,
+} from '@/db/queries/user-preferences';
 
 /**
  * Seed preset categories and activities on first launch.
@@ -66,5 +70,28 @@ export async function seedNotificationPreferencesIfNeeded(): Promise<void> {
         created_at, updated_at)
      VALUES (?, NULL, 1, 1, NULL, 0, 0, '22:00', '07:00', ?, ?)`,
     [generateId(), now, now]
+  );
+}
+
+/**
+ * Seed the singleton user_preferences row on first launch.
+ * Idempotent — no-op if any non-deleted row already exists.
+ */
+export async function seedUserPreferencesIfNeeded(): Promise<void> {
+  const existing = await db.getOptional<{ count: number }>(
+    'SELECT COUNT(*) as count FROM user_preferences WHERE deleted_at IS NULL'
+  );
+
+  if (existing && existing.count > 0) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  await db.execute(
+    `INSERT INTO user_preferences
+       (id, user_id, week_start_day, default_insights_period, default_timezone,
+        created_at, updated_at)
+     VALUES (?, NULL, ?, ?, NULL, ?, ?)`,
+    [generateId(), DEFAULT_WEEK_START_DAY, DEFAULT_INSIGHTS_PERIOD, now, now]
   );
 }
