@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@powersync/react";
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useMemo, useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SettingRow } from "@/components/settings/setting-row";
@@ -10,6 +10,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { NOTIFICATION_PREFERENCES_QUERY } from "@/db/queries";
 import type { NotificationPreferencesRecord } from "@/db/schema";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { exportDataAsJson } from "@/lib/export-json";
 
 const WEEK_START_LABELS: Record<number, string> = {
   0: "Mon",
@@ -59,6 +60,21 @@ export default function SettingsScreen(): React.ReactElement {
   );
   const prefs = prefsData.length > 0 ? prefsData[0] : null;
   const { preferences } = useUserPreferences();
+  const [isExportingJson, setIsExportingJson] = useState(false);
+
+  const handleExportJson = useCallback(async () => {
+    if (isExportingJson) return;
+    setIsExportingJson(true);
+    try {
+      await exportDataAsJson();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown error";
+      Alert.alert("Export failed", message);
+    } finally {
+      setIsExportingJson(false);
+    }
+  }, [isExportingJson]);
 
   const goToGeneralPreferences = useCallback(() => {
     router.push("/general-preferences");
@@ -154,6 +170,20 @@ export default function SettingsScreen(): React.ReactElement {
           iconBackground={COLORS.surfaceContainer}
           iconChildren={
             <Feather name="tag" size={20} color={COLORS.primary} />
+          }
+        />
+        <SettingRow
+          title="Export data"
+          description={
+            isExportingJson
+              ? "Preparing export…"
+              : "Save a JSON snapshot of everything you've tracked"
+          }
+          onPress={handleExportJson}
+          disabled={isExportingJson}
+          iconBackground={COLORS.surfaceContainer}
+          iconChildren={
+            <Feather name="download" size={20} color={COLORS.primary} />
           }
         />
       </ScrollView>
