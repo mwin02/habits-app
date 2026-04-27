@@ -30,6 +30,7 @@ import {
   seedPresetsIfNeeded,
   seedUserPreferencesIfNeeded,
 } from "@/db/seed";
+import { AuthProvider } from "@/hooks/useAuth";
 import { useNotificationScheduler } from "@/hooks/useNotificationScheduler";
 import { db } from "@/lib/powersync";
 
@@ -106,10 +107,15 @@ function RootLayoutNav() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <PowerSyncContext.Provider value={db}>
+      <AuthProvider>
       <NotificationSchedulerMount />
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="(auth)"
+            options={{ headerShown: false, presentation: "modal" }}
+          />
           <Stack.Screen name="modal" options={{ presentation: "modal" }} />
           <Stack.Screen
             name="manage-activities"
@@ -169,6 +175,7 @@ function RootLayoutNav() {
           />
         </Stack>
       </ThemeProvider>
+      </AuthProvider>
     </PowerSyncContext.Provider>
     </GestureHandlerRootView>
   );
