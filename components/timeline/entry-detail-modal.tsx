@@ -8,6 +8,7 @@ import type { TimelineEntryData } from "@/hooks/useTimelineData";
 import {
   formatDuration,
   formatTimeInTimezone,
+  isNearMidnight,
   isSameDay,
 } from "@/lib/timezone";
 import { Feather } from "@expo/vector-icons";
@@ -160,11 +161,34 @@ export function EntryDetailModal({
         : null;
   const pickerOnChange =
     activePicker === "start" ? handleStartChange : handleEndChange;
-  const pickerMin = activePicker === "end" ? editedStart : undefined;
-  const pickerMax =
-    activePicker === "start"
-      ? editedEnd ?? new Date()
-      : new Date();
+  // Constrain the editable window to ±1 day from the original entry's start.
+  // This isn't for tracking multi-day activities — just for spanning a single
+  // day boundary.
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const anchorMs = entry.startedAt.getTime();
+  const startFloor = new Date(anchorMs - ONE_DAY_MS);
+  const startCeil = new Date(
+    Math.min(editedEnd?.getTime() ?? now.getTime(), now.getTime()),
+  );
+  const endFloor = editedStart;
+  const endCeil = new Date(
+    Math.min(editedStart.getTime() + ONE_DAY_MS, now.getTime()),
+  );
+  const pickerMin = activePicker === "start" ? startFloor : endFloor;
+  const pickerMax = activePicker === "start" ? startCeil : endCeil;
+
+  // Show the date column on the picker only when the activity actually
+  // straddles (or sits near) a day boundary. Otherwise keep the simpler
+  // time-only picker.
+  const crossesMidnight =
+    editedEnd !== null &&
+    !isSameDay(editedStart.toISOString(), editedEnd.toISOString(), tz);
+  const nearBoundary =
+    isNearMidnight(editedStart, tz) ||
+    (editedEnd !== null && isNearMidnight(editedEnd, tz));
+  const pickerMode: "time" | "datetime" =
+    crossesMidnight || nearBoundary ? "datetime" : "time";
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -292,7 +316,7 @@ export function EntryDetailModal({
             <View style={styles.pickerContainer}>
               <DateTimePicker
                 value={pickerValue}
-                mode="datetime"
+                mode={pickerMode}
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={pickerOnChange}
                 minimumDate={pickerMin}

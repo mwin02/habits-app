@@ -8,6 +8,7 @@ import {
   formatDuration,
   formatTimeInTimezone,
   getCurrentTimezone,
+  isNearMidnight,
   isSameDay,
 } from "@/lib/timezone";
 import { Feather } from "@expo/vector-icons";
@@ -132,12 +133,32 @@ export function GapFillModal({
   const pickerValue = activePicker === "start" ? editedStart : editedEnd;
   const pickerOnChange =
     activePicker === "start" ? handleStartChange : handleEndChange;
-  // Constrain pickers relative to each other and "now". Users can extend
-  // across midnight by picking a date earlier than (or later than) the
-  // original gap's day.
-  const pickerMin = activePicker === "end" ? editedStart : undefined;
-  const pickerMax =
-    activePicker === "start" ? editedEnd : new Date();
+  // Constrain to ±1 day from the gap's anchor — this is for single-day-boundary
+  // crossings, not multi-day activities.
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const anchorMs = gap.startedAt.getTime();
+  const startFloor = new Date(anchorMs - ONE_DAY_MS);
+  const startCeil = editedEnd;
+  const endFloor = editedStart;
+  const endCeil = new Date(
+    Math.min(editedStart.getTime() + ONE_DAY_MS, now.getTime()),
+  );
+  const pickerMin = activePicker === "start" ? startFloor : endFloor;
+  const pickerMax = activePicker === "start" ? startCeil : endCeil;
+
+  // Smart mode: only expose the date column when we're actually near or
+  // across a day boundary.
+  const crossesMidnight = !isSameDay(
+    editedStart.toISOString(),
+    editedEnd.toISOString(),
+    timezone,
+  );
+  const nearBoundary =
+    isNearMidnight(editedStart, timezone) ||
+    isNearMidnight(editedEnd, timezone);
+  const pickerMode: "time" | "datetime" =
+    crossesMidnight || nearBoundary ? "datetime" : "time";
 
   return (
     <Modal
@@ -244,7 +265,7 @@ export function GapFillModal({
             <View style={styles.pickerContainer}>
               <DateTimePicker
                 value={pickerValue}
-                mode="datetime"
+                mode={pickerMode}
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={pickerOnChange}
                 minimumDate={pickerMin}
