@@ -13,7 +13,6 @@
 -- already in the public search_path on Supabase, so we use it for column
 -- defaults to avoid the `extensions.` schema qualifier on every table.
 create extension if not exists "uuid-ossp" with schema extensions;
-create extension if not exists "btree_gist";
 
 -- =========================================================================
 -- categories
@@ -78,23 +77,35 @@ create table time_entries (
   source            text,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
-  deleted_at        timestamptz,
-  -- No two non-deleted entries from the same user may overlap in time.
-  -- A NULL ended_at means the entry is still running (open-ended range).
-  constraint time_entries_no_overlap exclude using gist (
-    user_id with =,
-    tstzrange(started_at, coalesce(ended_at, 'infinity'::timestamptz)) with &&
-  ) where (deleted_at is null)
+  deleted_at        timestamptz
 );
 create index time_entries_by_started  on time_entries (started_at);
-create index time_entries_by_running  on time_entries (user_id) where (ended_at is null and deleted_at is null);
 create index time_entries_by_activity on time_entries (activity_id, started_at);
 create index time_entries_by_user     on time_entries (user_id);
 
+-- Enforce the actual product invariant: at most one running (ended_at IS NULL)
+-- entry per user at a time. This handles the multi-device race where two
+-- devices try to insert a running entry concurrently and the auto-close
+-- trigger below didn't see the other in flight.
+--
+-- We deliberately do NOT enforce overlap exclusion on closed entries — the
+-- client allows overlaps in retroactive/edit flows today, and a future
+-- "multi-tasking" feature would only widen that. Data-quality checks for
+-- overlapping closed entries belong in the analytics layer (insights
+-- queries already clip ranges, see CLAUDE.md "Range aggregations must clip
+-- entry durations").
+--
+-- Doubles as the fast lookup index for "find my running entry".
+create unique index time_entries_one_running_per_user
+  on time_entries (user_id)
+  where ended_at is null and deleted_at is null;
+
 -- Multi-device running-timer reconciliation: before inserting/updating a
 -- running entry, auto-close any other running entry for the same user.
--- Avoids exclusion-constraint conflicts when device A starts a timer while
--- device B already had one running.
+-- Without this, two devices both racing to start a timer would each insert
+-- a row with ended_at IS NULL and the unique partial index above would
+-- reject the loser. With this trigger, the second insert closes the first
+-- before its own row hits the index.
 create or replace function close_running_entries_for_user()
 returns trigger
 language plpgsql
