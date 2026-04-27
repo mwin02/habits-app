@@ -5,7 +5,12 @@ import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { deleteEntry, setEntryTags, updateEntryTimes } from "@/db/queries";
 import { useEntryTags } from "@/hooks/useEntryTags";
 import type { TimelineEntryData } from "@/hooks/useTimelineData";
-import { formatDuration, formatTimeInTimezone } from "@/lib/timezone";
+import {
+  formatDuration,
+  formatTimeInTimezone,
+  isNearMidnight,
+  isSameDay,
+} from "@/lib/timezone";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -40,23 +45,29 @@ export function EntryDetailModal({
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const { tags: entryTags } = useEntryTags(entry?.id ?? null);
 
-  // Reset state when entry changes
+  // Reset state when entry changes — always seed from the real (un-clamped)
+  // stored times so a cross-midnight entry shows its true start/end rather
+  // than the day boundary the canvas clamped to.
   useEffect(() => {
     if (entry) {
-      setEditedStart(entry.startedAt);
-      setEditedEnd(entry.endedAt);
+      setEditedStart(entry.realStartedAt);
+      setEditedEnd(entry.realEndedAt);
       setActivePicker(null);
     }
   }, [entry?.id]);
 
-  const timesDirty =
+  const startDirty =
+    entry != null && editedStart.getTime() !== entry.realStartedAt.getTime();
+  const endDirty =
     entry != null &&
-    (editedStart.getTime() !== entry.startedAt.getTime() ||
-      (editedEnd != null &&
-        entry.endedAt != null &&
-        editedEnd.getTime() !== entry.endedAt.getTime()));
+    editedEnd != null &&
+    entry.realEndedAt != null &&
+    editedEnd.getTime() !== entry.realEndedAt.getTime();
+  const timesDirty = startDirty || endDirty;
 
-  const isValid = editedEnd === null || editedStart < editedEnd;
+  const isValid =
+    (editedEnd === null || editedStart < editedEnd) &&
+    editedStart.getTime() <= Date.now();
 
   const handleStartChange = useCallback(
     (_event: unknown, date?: Date): void => {
@@ -74,7 +85,7 @@ export function EntryDetailModal({
   }, []);
 
   const handleSaveTimes = useCallback(async (): Promise<void> => {
-    if (!entry || !timesDirty || !isValid || editedEnd === null) return;
+    if (!entry || !timesDirty || !isValid) return;
     setSaving(true);
     try {
       await updateEntryTimes(entry.id, editedStart, editedEnd);
@@ -116,10 +127,23 @@ export function EntryDetailModal({
     return seconds > 0 ? formatDuration(seconds) : "—";
   })();
 
-  const startTimeLabel = formatTimeInTimezone(editedStart.toISOString(), tz);
-  const endTimeLabel = editedEnd
-    ? formatTimeInTimezone(editedEnd.toISOString(), tz)
-    : "Now";
+  // Show the date prefix on both edges when the entry spans different days,
+  // so start and end are labeled consistently.
+  const spansDays =
+    editedEnd !== null &&
+    !isSameDay(editedStart.toISOString(), editedEnd.toISOString(), tz);
+  const formatLabel = (d: Date): string => {
+    const time = formatTimeInTimezone(d.toISOString(), tz);
+    if (!spansDays) return time;
+    const dateShort = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: tz,
+    });
+    return `${dateShort}, ${time}`;
+  };
+  const startTimeLabel = formatLabel(editedStart);
+  const endTimeLabel = editedEnd ? formatLabel(editedEnd) : "Now";
 
   const sourceLabel =
     entry.source === "timer"
@@ -139,9 +163,34 @@ export function EntryDetailModal({
         : null;
   const pickerOnChange =
     activePicker === "start" ? handleStartChange : handleEndChange;
-  const pickerMin = activePicker === "end" ? editedStart : undefined;
-  const pickerMax =
-    activePicker === "start" ? (editedEnd ?? new Date()) : new Date();
+  // Constrain the editable window to ±1 day from the original entry's start.
+  // This isn't for tracking multi-day activities — just for spanning a single
+  // day boundary.
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const anchorMs = entry.realStartedAt.getTime();
+  const startFloor = new Date(anchorMs - ONE_DAY_MS);
+  const startCeil = new Date(
+    Math.min(editedEnd?.getTime() ?? now.getTime(), now.getTime()),
+  );
+  const endFloor = editedStart;
+  const endCeil = new Date(
+    Math.min(editedStart.getTime() + ONE_DAY_MS, now.getTime()),
+  );
+  const pickerMin = activePicker === "start" ? startFloor : endFloor;
+  const pickerMax = activePicker === "start" ? startCeil : endCeil;
+
+  // Show the date column on the picker only when the activity actually
+  // straddles (or sits near) a day boundary. Otherwise keep the simpler
+  // time-only picker.
+  const crossesMidnight =
+    editedEnd !== null &&
+    !isSameDay(editedStart.toISOString(), editedEnd.toISOString(), tz);
+  const nearBoundary =
+    isNearMidnight(editedStart, tz) ||
+    (editedEnd !== null && isNearMidnight(editedEnd, tz));
+  const pickerMode: "time" | "datetime" =
+    crossesMidnight || nearBoundary ? "datetime" : "time";
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
@@ -212,7 +261,6 @@ export function EntryDetailModal({
                 activePicker === "start" && styles.timeRowActive,
               ]}
               onPress={() => handleTogglePicker("start")}
-              disabled={entry.endedAt === null} // Disable if entry is running since start time to not allow editing of active entry
             >
               <Text style={styles.timeLabel}>Start</Text>
               <Text
@@ -223,19 +271,15 @@ export function EntryDetailModal({
               >
                 {startTimeLabel}
               </Text>
-              {entry.endedAt !== null && (
-                <Feather
-                  name={
-                    activePicker === "start" ? "chevron-up" : "chevron-down"
-                  }
-                  size={16}
-                  color={
-                    activePicker === "start"
-                      ? COLORS.primary
-                      : COLORS.onSurfaceVariant
-                  }
-                />
-              )}
+              <Feather
+                name={activePicker === "start" ? "chevron-up" : "chevron-down"}
+                size={16}
+                color={
+                  activePicker === "start"
+                    ? COLORS.primary
+                    : COLORS.onSurfaceVariant
+                }
+              />
             </Pressable>
 
             {/* End time row */}
@@ -274,7 +318,7 @@ export function EntryDetailModal({
             <View style={styles.pickerContainer}>
               <DateTimePicker
                 value={pickerValue}
-                mode="time"
+                mode={pickerMode}
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={pickerOnChange}
                 minimumDate={pickerMin}
@@ -286,7 +330,7 @@ export function EntryDetailModal({
 
           {/* Actions — fixed-height row to avoid modal resize */}
           <View style={styles.actions}>
-            {timesDirty && isValid && editedEnd !== null ? (
+            {timesDirty && isValid ? (
               <>
                 <Pressable
                   onPress={handleSaveTimes}
@@ -318,7 +362,9 @@ export function EntryDetailModal({
             ) : timesDirty && !isValid ? (
               <>
                 <Text style={styles.validationError}>
-                  Start must be before end
+                  {editedStart.getTime() > Date.now()
+                    ? "Start can't be in the future"
+                    : "Start must be before end"}
                 </Text>
                 <Pressable
                   style={styles.deleteIconButton}

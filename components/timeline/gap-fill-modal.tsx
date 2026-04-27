@@ -8,6 +8,8 @@ import {
   formatDuration,
   formatTimeInTimezone,
   getCurrentTimezone,
+  isNearMidnight,
+  isSameDay,
 } from "@/lib/timezone";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -108,19 +110,55 @@ export function GapFillModal({
   const durationSeconds = Math.round(
     (editedEnd.getTime() - editedStart.getTime()) / 1000,
   );
-  const startLabel = formatTimeInTimezone(editedStart.toISOString(), timezone);
-  const endLabel = formatTimeInTimezone(editedEnd.toISOString(), timezone);
+  const sameDay = isSameDay(
+    editedStart.toISOString(),
+    editedEnd.toISOString(),
+    timezone,
+  );
+  const formatLabel = (d: Date): string => {
+    const time = formatTimeInTimezone(d.toISOString(), timezone);
+    if (sameDay) return time;
+    const dateShort = d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: timezone,
+    });
+    return `${dateShort}, ${time}`;
+  };
+  const startLabel = formatLabel(editedStart);
+  const endLabel = formatLabel(editedEnd);
   const isValid = editedStart < editedEnd;
 
   // Picker config based on active picker
   const pickerValue = activePicker === "start" ? editedStart : editedEnd;
   const pickerOnChange =
     activePicker === "start" ? handleStartChange : handleEndChange;
-  // Constrain pickers within the original gap bounds and each other
-  const pickerMin =
-    activePicker === "start" ? gap.startedAt : editedStart;
-  const pickerMax =
-    activePicker === "start" ? editedEnd : gap.endedAt;
+  // Constrain to ±1 day from the gap's anchor — this is for single-day-boundary
+  // crossings, not multi-day activities.
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const anchorMs = gap.startedAt.getTime();
+  const startFloor = new Date(anchorMs - ONE_DAY_MS);
+  const startCeil = editedEnd;
+  const endFloor = editedStart;
+  const endCeil = new Date(
+    Math.min(editedStart.getTime() + ONE_DAY_MS, now.getTime()),
+  );
+  const pickerMin = activePicker === "start" ? startFloor : endFloor;
+  const pickerMax = activePicker === "start" ? startCeil : endCeil;
+
+  // Smart mode: only expose the date column when we're actually near or
+  // across a day boundary.
+  const crossesMidnight = !isSameDay(
+    editedStart.toISOString(),
+    editedEnd.toISOString(),
+    timezone,
+  );
+  const nearBoundary =
+    isNearMidnight(editedStart, timezone) ||
+    isNearMidnight(editedEnd, timezone);
+  const pickerMode: "time" | "datetime" =
+    crossesMidnight || nearBoundary ? "datetime" : "time";
 
   return (
     <Modal
@@ -227,7 +265,7 @@ export function GapFillModal({
             <View style={styles.pickerContainer}>
               <DateTimePicker
                 value={pickerValue}
-                mode="time"
+                mode={pickerMode}
                 display={Platform.OS === "ios" ? "spinner" : "default"}
                 onChange={pickerOnChange}
                 minimumDate={pickerMin}

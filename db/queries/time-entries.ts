@@ -150,13 +150,20 @@ export async function updateEntryNote(entryId: string, note: string | null): Pro
   );
 }
 
-/** Update start/end times of a time entry, recalculating duration */
+/** Update start/end times of a time entry, recalculating duration. Pass `endedAt = null` for a running entry. */
 export async function updateEntryTimes(
   entryId: string,
   startedAt: Date,
-  endedAt: Date,
+  endedAt: Date | null,
 ): Promise<void> {
   const startStr = startedAt.toISOString();
+  if (endedAt === null) {
+    await db.execute(
+      'UPDATE time_entries SET started_at = ?, ended_at = NULL, duration_seconds = NULL, updated_at = ? WHERE id = ?',
+      [startStr, nowUTC(), entryId],
+    );
+    return;
+  }
   const endStr = endedAt.toISOString();
   const durationSeconds = Math.round(
     (endedAt.getTime() - startedAt.getTime()) / 1000,

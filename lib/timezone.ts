@@ -50,6 +50,28 @@ export function isToday(isoString: string, timezone: string): boolean {
 }
 
 /**
+ * Returns true if `date`'s local wall-clock time in `timezone` is within
+ * `thresholdMinutes` of midnight (on either side). Used to decide when a
+ * date+time picker should expose the date column — most of the day we only
+ * need a time picker, but near midnight users may need to cross days.
+ */
+export function isNearMidnight(
+  date: Date,
+  timezone: string,
+  thresholdMinutes = 120,
+): boolean {
+  const hhmm = date.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: timezone,
+  });
+  const [h, m] = hhmm.split(':').map(Number);
+  const minutes = h * 60 + m;
+  return minutes < thresholdMinutes || minutes > 1440 - thresholdMinutes;
+}
+
+/**
  * Check if two ISO 8601 UTC strings fall on the same calendar day in the given timezone.
  */
 export function isSameDay(iso1: string, iso2: string, timezone: string): boolean {

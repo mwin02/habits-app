@@ -23,6 +23,17 @@ export type TimelineEntryData = TimelineEntry & {
   categoryIcon: string | null;
   /** True when a tag filter is active and this entry doesn't match. */
   dimmed?: boolean;
+  /**
+   * The actual stored start time, un-clamped to the displayed day. The
+   * `startedAt` field is clamped so the canvas can position blocks within
+   * the day; consumers that need the true time (e.g. the detail modal,
+   * which lets users edit the value) must read `realStartedAt`.
+   */
+  realStartedAt: Date;
+  /** The actual stored end time, or null for a running entry. */
+  realEndedAt: Date | null;
+  /** Real duration in seconds (null for running entries). */
+  realDurationSeconds: number | null;
 };
 
 /** A cluster of consecutive short entries */
@@ -298,9 +309,7 @@ export function useTimelineData(
     const effectiveDayEnd = isToday && now < dayEnd ? now : dayEnd;
 
     // Transform rows into TimelineEntry objects, clamping to day boundaries
-    const entries: (TimelineEntry & {
-      activityId: string;
-      categoryIcon: string | null;
+    const entries: (TimelineEntryData & {
       clampedStart: Date;
       clampedEnd: Date;
     })[] = rows.map((row) => {
@@ -357,6 +366,9 @@ export function useTimelineData(
         dimmed,
         clampedStart,
         clampedEnd,
+        realStartedAt: startedAt,
+        realEndedAt: realEndedAt,
+        realDurationSeconds: row.duration_seconds,
       };
     });
 
