@@ -57,19 +57,47 @@ row pointing to user B's `entry_id` from user A's session — should fail.
 ## PowerSync Cloud setup
 
 1. Sign up at [powersync.com](https://www.powersync.com) (free tier).
-2. **Create instance** and connect to your Supabase project:
+2. **Create the `powersync` publication in Supabase** before adding the
+   data source. PowerSync subscribes to a logical-replication publication
+   with this exact name; without it, "Test connection" fails with
+   `Publication 'powersync' not found`. Run in the Supabase SQL editor:
+   ```sql
+   create publication powersync for table
+     categories,
+     activities,
+     time_entries,
+     ideal_allocations,
+     notification_preferences,
+     tags,
+     entry_tags,
+     user_preferences;
+   ```
+   Verify with `select * from pg_publication_tables where pubname = 'powersync';`
+   — expect 8 rows. **Whenever you add a new synced table in a future
+   migration, also append it:**
+   `alter publication powersync add table <new_table>;` Otherwise PowerSync
+   silently misses writes to it (no error — just missing data).
+3. **Create instance** and connect to your Supabase project:
    - Choose Supabase as the data source.
    - Paste the Postgres connection string (from Supabase → Project Settings →
      Database). Use the **service role** connection — PowerSync uses logical
      replication and needs broad read access. This connection string lives
      only in PowerSync's dashboard, not in this repo.
-3. **Paste sync rules**: copy the contents of `sync-rules.yaml` into the
-   PowerSync dashboard's sync rules editor and deploy.
-4. **Configure JWT auth**: point PowerSync at your Supabase project's JWKS
-   URL so it can verify Supabase-issued JWTs. The form takes:
+4. **Paste sync rules**: copy the contents of `sync-rules.yaml` into the
+   PowerSync dashboard's Sync Rules / Sync Streams editor and deploy.
+   **The dashboard is the source of truth for what's actually deployed** —
+   `sync-rules.yaml` in this repo is just a committed record. They can
+   drift; re-paste from the file every time you change it.
+5. **Configure JWT auth** in PowerSync → Client Auth. Supabase signs JWTs
+   asymmetrically (ECC P-256) by default, so use JWKS:
    - JWKS URI: `https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json`
    - Audience: `authenticated`
-5. **Copy the PowerSync instance URL** — this becomes
+   - Issuer (if asked): `https://<project-ref>.supabase.co/auth/v1`
+
+   No live verification fires until Block 4 hooks up the connector with a
+   real signed-in client. PowerSync's Health page will show "All clear" as
+   long as Sync Rules + Database Connection are green.
+6. **Copy the PowerSync instance URL** — this becomes
    `EXPO_PUBLIC_POWERSYNC_URL` in the app's `.env`.
 
 ## Local env wiring (mobile app)

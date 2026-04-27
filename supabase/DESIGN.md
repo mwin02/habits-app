@@ -201,7 +201,7 @@ Two bucket families in `supabase/sync-rules.yaml`:
 - **`by_user`** (parameter `request.user_id()`) — all eight user-owned
   tables. `daily_summaries` is excluded (local cache only).
 
-PowerSync sync-rule **limitations** worth knowing:
+PowerSync sync-rule **limitations and gotchas** worth knowing:
 
 - Data queries are single-table flat selects. No JOINs, no CTEs, no
   subqueries. (Drove the `entry_tags.user_id` denormalization.)
@@ -210,6 +210,16 @@ PowerSync sync-rule **limitations** worth knowing:
 - The bucket name is part of the sync key; renaming a bucket forces every
   client to re-download those rows on next sync. Avoid bucket renames
   post-launch unless you accept the bandwidth.
+- **The PowerSync dashboard is the source of truth** for what's deployed.
+  `supabase/sync-rules.yaml` in this repo is a committed record, not
+  auto-deployed. Re-paste every time you edit the file. The two can drift.
+- **Deploying sync rules invalidates affected client buckets** — connected
+  clients re-download the changed data on next sync. Negligible
+  pre-launch; per-client bandwidth bump after.
+- Validation in the PowerSync editor catches syntax (unknown columns, bad
+  parameters) but **not** publication membership — referencing a table
+  that's not in the `powersync` publication "deploys" cleanly but the
+  table never streams. Watch Diagnostics / Logs after each deploy.
 
 ---
 
@@ -273,3 +283,22 @@ Verify:
 select count(*) from categories where is_preset;  -- 10
 select count(*) from activities where is_preset;  -- 41
 ```
+
+### Adding a new synced table
+
+When a future migration adds a synced table (i.e. anything that isn't
+`localOnly` on the client), three things must happen together:
+
+1. The migration creates the table with RLS + policies.
+2. The table is added to the `powersync` publication:
+   ```sql
+   alter publication powersync add table <new_table>;
+   ```
+   Otherwise PowerSync replication won't see writes — silently. No error.
+3. `supabase/sync-rules.yaml` gains a `SELECT … WHERE user_id = bucket.user_id`
+   line in the `by_user` bucket (or the appropriate bucket), and that
+   change is **redeployed via the PowerSync dashboard**. Editing the file
+   alone does nothing until you paste it into the editor.
+
+Skipping any one of these results in a silently-broken sync. Treat the
+three as an atomic unit when reviewing PRs that add tables.
