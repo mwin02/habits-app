@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { SocialButtons } from "@/components/auth/social-buttons";
 import { GradientButton } from "@/components/common/gradient-button";
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { useAuth } from "@/hooks/useAuth";
@@ -117,6 +118,12 @@ export default function SignInScreen(): React.ReactElement {
             <Pressable onPress={goToForgot} style={styles.linkRow}>
               <Text style={styles.linkText}>Forgot password?</Text>
             </Pressable>
+
+            <SocialButtons
+              disabled={submitting}
+              onStart={() => setError(null)}
+              onError={setError}
+            />
           </View>
 
           <View style={styles.footer}>

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { SocialButtons } from "@/components/auth/social-buttons";
 import { GradientButton } from "@/components/common/gradient-button";
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { useAuth } from "@/hooks/useAuth";
@@ -145,6 +146,15 @@ export default function SignUpScreen(): React.ReactElement {
             >
               <Feather name="user-plus" size={18} color={COLORS.onPrimary} />
             </GradientButton>
+
+            <SocialButtons
+              disabled={submitting}
+              onStart={() => {
+                setError(null);
+                setInfo(null);
+              }}
+              onError={setError}
+            />
           </View>
 
           <View style={styles.footer}>

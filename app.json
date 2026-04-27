@@ -14,7 +14,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.myozawwin.horae"
+      "bundleIdentifier": "com.myozawwin.horae",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {
@@ -41,7 +42,9 @@
           "defaultChannel": "default"
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true
