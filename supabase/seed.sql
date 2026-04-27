@@ -24,13 +24,15 @@ create or replace function _seed_preset_namespace()
 returns uuid language sql immutable as
 $$ select 'b6c1f4d2-7e9a-5c43-9f0b-2a8e3d6f1c00'::uuid $$;
 
+-- uuid_generate_v5 lives in Supabase's `extensions` schema (not on the
+-- default search_path), so we qualify the call explicitly.
 create or replace function _seed_category_id(p_name text)
 returns uuid language sql immutable as
-$$ select uuid_generate_v5(_seed_preset_namespace(), 'category:' || p_name) $$;
+$$ select extensions.uuid_generate_v5(_seed_preset_namespace(), 'category:' || p_name) $$;
 
 create or replace function _seed_activity_id(p_category text, p_activity text)
 returns uuid language sql immutable as
-$$ select uuid_generate_v5(_seed_preset_namespace(), 'activity:' || p_category || ':' || p_activity) $$;
+$$ select extensions.uuid_generate_v5(_seed_preset_namespace(), 'activity:' || p_category || ':' || p_activity) $$;
 
 -- =========================================================================
 -- Categories

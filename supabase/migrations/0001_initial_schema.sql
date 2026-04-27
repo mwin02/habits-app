@@ -8,14 +8,18 @@
 -- `is_preset = true`. Sync rules expose them globally; RLS keeps them
 -- read-only for end users (only this migration / seed.sql writes them).
 
-create extension if not exists "uuid-ossp";
+-- uuid-ossp gives us uuid_generate_v5 (used in seed.sql for deterministic
+-- preset IDs). gen_random_uuid() comes from pgcrypto / Postgres core and is
+-- already in the public search_path on Supabase, so we use it for column
+-- defaults to avoid the `extensions.` schema qualifier on every table.
+create extension if not exists "uuid-ossp" with schema extensions;
 create extension if not exists "btree_gist";
 
 -- =========================================================================
 -- categories
 -- =========================================================================
 create table categories (
-  id              uuid        primary key default uuid_generate_v4(),
+  id              uuid        primary key default gen_random_uuid(),
   user_id         uuid        references auth.users(id) on delete cascade,
   name            text        not null,
   color           text        not null,
@@ -39,7 +43,7 @@ create index categories_by_user     on categories (user_id);
 -- activities
 -- =========================================================================
 create table activities (
-  id              uuid        primary key default uuid_generate_v4(),
+  id              uuid        primary key default gen_random_uuid(),
   user_id         uuid        references auth.users(id) on delete cascade,
   category_id     uuid        not null references categories(id) on delete cascade,
   name            text        not null,
@@ -63,7 +67,7 @@ create index activities_by_user     on activities (user_id);
 -- time_entries
 -- =========================================================================
 create table time_entries (
-  id                uuid        primary key default uuid_generate_v4(),
+  id                uuid        primary key default gen_random_uuid(),
   user_id           uuid        not null references auth.users(id) on delete cascade,
   activity_id       uuid        not null references activities(id),
   started_at        timestamptz not null,
@@ -121,7 +125,7 @@ create trigger time_entries_close_running
 -- ideal_allocations
 -- =========================================================================
 create table ideal_allocations (
-  id                      uuid        primary key default uuid_generate_v4(),
+  id                      uuid        primary key default gen_random_uuid(),
   user_id                 uuid        not null references auth.users(id) on delete cascade,
   category_id             uuid        not null references categories(id) on delete cascade,
   -- 0=Mon … 6=Sun. NULL = applies every day.
@@ -143,7 +147,7 @@ create index ideal_allocations_by_user         on ideal_allocations (user_id);
 -- notification_preferences
 -- =========================================================================
 create table notification_preferences (
-  id                          uuid        primary key default uuid_generate_v4(),
+  id                          uuid        primary key default gen_random_uuid(),
   user_id                     uuid        not null references auth.users(id) on delete cascade,
   idle_reminder_enabled       boolean     not null default false,
   long_running_enabled        boolean     not null default false,
@@ -162,7 +166,7 @@ create index notification_preferences_by_user on notification_preferences (user_
 -- tags
 -- =========================================================================
 create table tags (
-  id           uuid        primary key default uuid_generate_v4(),
+  id           uuid        primary key default gen_random_uuid(),
   user_id      uuid        not null references auth.users(id) on delete cascade,
   name         text        not null,
   color        text        not null,
@@ -179,7 +183,7 @@ create index tags_by_user on tags (user_id);
 -- entry_tags  (no user_id; scope follows time_entries)
 -- =========================================================================
 create table entry_tags (
-  id          uuid        primary key default uuid_generate_v4(),
+  id          uuid        primary key default gen_random_uuid(),
   entry_id    uuid        not null references time_entries(id) on delete cascade,
   tag_id      uuid        not null references tags(id) on delete cascade,
   created_at  timestamptz not null default now()
@@ -191,7 +195,7 @@ create index entry_tags_by_tag   on entry_tags (tag_id);
 -- user_preferences  (singleton per user)
 -- =========================================================================
 create table user_preferences (
-  id                       uuid        primary key default uuid_generate_v4(),
+  id                       uuid        primary key default gen_random_uuid(),
   user_id                  uuid        not null unique references auth.users(id) on delete cascade,
   week_start_day           integer,
   default_insights_period  text,
