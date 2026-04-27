@@ -21,9 +21,16 @@ interface AuthContextValue {
   signUp: (
     email: string,
     password: string,
-  ) => Promise<{ error: string | null; needsConfirmation: boolean }>;
+  ) => Promise<{
+    error: string | null;
+    needsConfirmation: boolean;
+    alreadyExists: boolean;
+  }>;
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  resendSignUpConfirmation: (
+    email: string,
+  ) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -75,10 +82,23 @@ export function AuthProvider({
         password,
       });
       if (error) {
-        return { error: error.message, needsConfirmation: false };
+        return {
+          error: error.message,
+          needsConfirmation: false,
+          alreadyExists: false,
+        };
       }
-      const needsConfirmation = !data.session;
-      return { error: null, needsConfirmation };
+      // Supabase obscures existing-email signups for security: it returns a
+      // user with an empty `identities` array (and no session) instead of an
+      // error. Detect that here so we can route the user to "Sign in" rather
+      // than the confirm-email screen.
+      const alreadyExists =
+        !!data.user &&
+        Array.isArray(data.user.identities) &&
+        data.user.identities.length === 0 &&
+        !data.session;
+      const needsConfirmation = !data.session && !alreadyExists;
+      return { error: null, needsConfirmation, alreadyExists };
     },
     [],
   );
@@ -94,6 +114,16 @@ export function AuthProvider({
     return { error: error?.message ?? null };
   }, []);
 
+  const resendSignUpConfirmation = useCallback<
+    AuthContextValue["resendSignUpConfirmation"]
+  >(async (email) => {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: email.trim(),
+    });
+    return { error: error?.message ?? null };
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
@@ -103,8 +133,17 @@ export function AuthProvider({
       signUp,
       signOut,
       sendPasswordReset,
+      resendSignUpConfirmation,
     }),
-    [session, loading, signInWithPassword, signUp, signOut, sendPasswordReset],
+    [
+      session,
+      loading,
+      signInWithPassword,
+      signUp,
+      signOut,
+      sendPasswordReset,
+      resendSignUpConfirmation,
+    ],
   );
 
   return React.createElement(AuthContext.Provider, { value }, children);

@@ -24,11 +24,11 @@ export default function SignUpScreen(): React.ReactElement {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = useCallback(async () => {
-    if (!email.trim() || !password) {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
       setError("Enter your email and password.");
       return;
     }
@@ -42,17 +42,23 @@ export default function SignUpScreen(): React.ReactElement {
     }
     setSubmitting(true);
     setError(null);
-    setInfo(null);
-    const result = await signUp(email, password);
+    const result = await signUp(trimmedEmail, password);
     setSubmitting(false);
     if (result.error) {
       setError(result.error);
       return;
     }
-    if (result.needsConfirmation) {
-      setInfo(
-        "Check your inbox for a confirmation email, then sign in.",
+    if (result.alreadyExists) {
+      setError(
+        "An account with this email already exists. Try signing in instead.",
       );
+      return;
+    }
+    if (result.needsConfirmation) {
+      router.replace({
+        pathname: "/(auth)/confirm-email",
+        params: { email: trimmedEmail },
+      });
       return;
     }
     if (router.canGoBack()) {
@@ -135,7 +141,6 @@ export default function SignUpScreen(): React.ReactElement {
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            {info ? <Text style={styles.info}>{info}</Text> : null}
 
             <GradientButton
               shape="pill"
@@ -203,10 +208,6 @@ const styles = StyleSheet.create({
   error: {
     ...TYPOGRAPHY.bodySmall,
     color: COLORS.error,
-  },
-  info: {
-    ...TYPOGRAPHY.bodySmall,
-    color: COLORS.secondary,
   },
   footer: {
     flexDirection: "row",

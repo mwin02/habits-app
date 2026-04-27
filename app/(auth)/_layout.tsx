@@ -14,6 +14,7 @@ export default function AuthLayout(): React.ReactElement {
       <Stack.Screen name="sign-in" />
       <Stack.Screen name="sign-up" />
       <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="confirm-email" />
     </Stack>
   );
 }
