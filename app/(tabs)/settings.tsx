@@ -1,14 +1,16 @@
 import { Feather } from "@expo/vector-icons";
 import { useQuery } from "@powersync/react";
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { SignOutPromptModal } from "@/components/common/sign-out-prompt-modal";
 import { SettingRow } from "@/components/settings/setting-row";
 import { COLORS, SPACING, TYPOGRAPHY } from "@/constants/theme";
 import { NOTIFICATION_PREFERENCES_QUERY } from "@/db/queries";
 import type { NotificationPreferencesRecord } from "@/db/schema";
+import { useAuth } from "@/hooks/useAuth";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 
 const WEEK_START_LABELS: Record<number, string> = {
@@ -59,6 +61,29 @@ export default function SettingsScreen(): React.ReactElement {
   );
   const prefs = prefsData.length > 0 ? prefsData[0] : null;
   const { preferences } = useUserPreferences();
+  const { user, signOut } = useAuth();
+  const [signOutPromptVisible, setSignOutPromptVisible] = useState(false);
+
+  const handleSignIn = useCallback(() => {
+    router.push("/(auth)/sign-in");
+  }, [router]);
+
+  const openSignOutPrompt = useCallback(() => {
+    setSignOutPromptVisible(true);
+  }, []);
+
+  const closeSignOutPrompt = useCallback(() => {
+    setSignOutPromptVisible(false);
+  }, []);
+
+  const handleSignOut = useCallback(
+    async (_wipeLocal: boolean) => {
+      // Block 6 wires the wipeLocal path; for now both options just sign out.
+      await signOut();
+      setSignOutPromptVisible(false);
+    },
+    [signOut],
+  );
 
   const goToGeneralPreferences = useCallback(() => {
     router.push("/general-preferences");
@@ -106,6 +131,30 @@ export default function SettingsScreen(): React.ReactElement {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       >
+        <Text style={styles.sectionLabel}>Account</Text>
+        {user ? (
+          <SettingRow
+            title={user.email ?? "Signed in"}
+            description="Tap to sign out"
+            onPress={openSignOutPrompt}
+            iconBackground={COLORS.surfaceContainer}
+            iconChildren={
+              <Feather name="user" size={20} color={COLORS.primary} />
+            }
+          />
+        ) : (
+          <SettingRow
+            title="Sign in"
+            description="Back up and sync across devices"
+            onPress={handleSignIn}
+            iconBackground={COLORS.surfaceContainer}
+            iconChildren={
+              <Feather name="log-in" size={20} color={COLORS.primary} />
+            }
+          />
+        )}
+
+        <Text style={styles.sectionLabel}>Preferences</Text>
         <SettingRow
           title="General"
           description={`Week starts ${WEEK_START_LABELS[preferences.weekStartDay]} · Insights ${PERIOD_LABELS[preferences.defaultInsightsPeriod]}`}
@@ -170,6 +219,12 @@ export default function SettingsScreen(): React.ReactElement {
           }
         />
       </ScrollView>
+
+      <SignOutPromptModal
+        visible={signOutPromptVisible}
+        onDismiss={closeSignOutPrompt}
+        onSignOut={handleSignOut}
+      />
     </SafeAreaView>
   );
 }
@@ -197,5 +252,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING["4xl"],
     gap: SPACING.sm,
+  },
+  sectionLabel: {
+    ...TYPOGRAPHY.labelUppercase,
+    color: COLORS.onSurfaceVariant,
+    paddingHorizontal: SPACING.sm,
+    paddingTop: SPACING.sm,
   },
 });
