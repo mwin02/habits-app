@@ -98,6 +98,24 @@ horae/
 5. **Timezones:** All times stored in UTC as ISO 8601 strings. Each time_entry stores its IANA timezone at creation. Display in original timezone.
 6. **PowerSync OP-SQLite adapter:** Must use `OPSqliteOpenFactory` explicitly — the default adapter (`@journeyapps/react-native-quick-sqlite`) is not installed.
 
+## Phase 3 cloud sync (backend in `supabase/`)
+
+Supabase Postgres is the source of truth; PowerSync Cloud filters per-user
+buckets to the client over WebSocket; uploads go through Supabase REST.
+Auth is **deferred** — the app stays fully usable without an account.
+
+Hard constraints feature work needs to know:
+
+- **All persistent data is user-scoped post-auth.** Every `SELECT`/`UPDATE`/`DELETE` in `db/queries/**` must filter by current user (or `user_id IS NULL OR user_id = ?` for `categories`/`activities`, where presets are global). Block 6 introduces a `currentUserId()` getter — use it.
+- **Presets are server-owned and read-only to clients.** RLS + a CHECK constraint enforce this. Don't write `is_preset = true` rows from app code; never mutate a preset row's `user_id`. Block 5 handles the local→server preset remap.
+- **No DB-level overlap constraint on `time_entries`.** The client may produce overlapping closed entries (retroactive edits, etc.) and they sync fine. The server enforces only "≤1 running entry per user" via a partial unique index + auto-close trigger. Insights queries already clip ranges; do the same in any new aggregation.
+- **`entry_tags.user_id` is server-managed.** A trigger fills it from the parent `time_entries` on insert/update. When `db/schema.ts` flips `entry_tags` to `localOnly: false` (Block 4), add a nullable `user_id` column locally and let the server set it on upload.
+- **Constraint failures are fatal for PowerSync uploads.** Don't add Postgres CHECK / UNIQUE / FK constraints unless the client *already* enforces them — a single bad row will stall the upload queue indefinitely.
+
+For the *why* behind these (preset UUID scheme, sync-rule limitations,
+preset-mutation playbook, full RLS contract, operational checklist), see
+[`supabase/DESIGN.md`](./supabase/DESIGN.md).
+
 ## Data Model (Core Tables)
 
 - **categories** — Work, Sleep, Health, etc. Has `sort_order`, `is_archived`, `is_preset`
