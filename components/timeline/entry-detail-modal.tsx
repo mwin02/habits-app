@@ -127,14 +127,14 @@ export function EntryDetailModal({
     return seconds > 0 ? formatDuration(seconds) : "—";
   })();
 
+  // Show the date prefix on both edges when the entry spans different days,
+  // so start and end are labeled consistently.
+  const spansDays =
+    editedEnd !== null &&
+    !isSameDay(editedStart.toISOString(), editedEnd.toISOString(), tz);
   const formatLabel = (d: Date): string => {
     const time = formatTimeInTimezone(d.toISOString(), tz);
-    const sameAsEntryStart = isSameDay(
-      d.toISOString(),
-      entry.realStartedAt.toISOString(),
-      tz,
-    );
-    if (sameAsEntryStart) return time;
+    if (!spansDays) return time;
     const dateShort = d.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
